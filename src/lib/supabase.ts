@@ -1,4 +1,4 @@
-import { createBrowserClient, createServerClient } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
@@ -7,10 +7,6 @@ import { env, hasSupabaseEnv } from "./env";
 const missingUrl = "https://example.supabase.co";
 const missingKey = "missing-key";
 type CookieToSet = { name: string; value: string; options: CookieOptions };
-
-export function createSupabaseBrowserClient() {
-  return createBrowserClient(env.supabaseUrl || missingUrl, env.supabaseAnonKey || missingKey);
-}
 
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies();

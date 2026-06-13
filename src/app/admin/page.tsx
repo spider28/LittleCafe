@@ -54,15 +54,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel title="Gallery upload">
-          <form action={uploadGalleryPhotoAction} className="grid gap-4">
+          <ActionForm action={uploadGalleryPhotoAction} buttonLabel="Upload photo">
             <Field name="altText" label="Alt text" required />
             <Field name="displayOrder" label="Display order" type="number" defaultValue="0" required />
             <label className="grid gap-1 text-sm font-medium text-ink">
               Photo
               <input name="photo" type="file" accept="image/*" required className="rounded-md border border-black/15 bg-white px-3 py-2 text-sm" />
             </label>
-            <SubmitButton>Upload photo</SubmitButton>
-          </form>
+          </ActionForm>
           <div className="mt-6 grid gap-3">
             {data.gallery.map((photo) => (
               <div key={photo.id} className="flex items-center justify-between gap-3 rounded-md bg-crema p-3 text-sm">

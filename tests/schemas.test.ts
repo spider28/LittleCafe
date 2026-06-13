@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { cafe } from "@/lib/content";
-import { contactSchema, reservationSchema, waiverSchema } from "@/lib/schemas";
+import { contactSchema, galleryUploadSchema, reservationSchema, waiverSchema } from "@/lib/schemas";
 
 describe("form schemas", () => {
   it("accepts a valid contact message", () => {
@@ -36,5 +36,14 @@ describe("form schemas", () => {
         status: "reserved"
       }).success
     ).toBe(false);
+  });
+
+  it("accepts gallery upload metadata", () => {
+    expect(
+      galleryUploadSchema.safeParse({
+        altText: "A sunny cafe table",
+        displayOrder: "2"
+      }).success
+    ).toBe(true);
   });
 });

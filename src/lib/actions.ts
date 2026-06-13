@@ -4,12 +4,16 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Resend } from "resend";
 import { cafe } from "./content";
-import { env } from "./env";
+import { env, hasSupabaseEnv } from "./env";
 import { contactSchema, galleryUploadSchema, reservationSchema, waiverSchema } from "./schemas";
 import { requireAdmin } from "./admin";
-import { createSupabaseAdminClient, createSupabaseServerClient } from "./supabase";
+import { createSupabaseServerClient } from "./supabase";
 
 export type ActionState = { ok: boolean; message: string };
+
+const galleryBucket = "gallery";
+const maxGalleryPhotoSize = 8 * 1024 * 1024;
+const allowedGalleryPhotoTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 function formValue(formData: FormData, key: string) {
   return String(formData.get(key) ?? "");
@@ -159,41 +163,60 @@ export async function deleteReservationAction(formData: FormData) {
   revalidatePath("/admin");
 }
 
-export async function uploadGalleryPhotoAction(formData: FormData) {
+export async function uploadGalleryPhotoAction(_state: ActionState, formData: FormData): Promise<ActionState> {
   const { allowed } = await requireAdmin();
   if (!allowed) redirect("/admin");
 
-  const parsed = galleryUploadSchema.parse({
+  if (!hasSupabaseEnv()) {
+    return { ok: false, message: "Supabase is not configured yet. Add the project URL and anon key." };
+  }
+
+  const parsed = galleryUploadSchema.safeParse({
     altText: formValue(formData, "altText"),
     displayOrder: formValue(formData, "displayOrder")
   });
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Please check the gallery details." };
+  }
+
   const file = formData.get("photo");
   if (!(file instanceof File) || file.size === 0) {
-    return;
+    return { ok: false, message: "Choose a photo to upload." };
+  }
+  if (!allowedGalleryPhotoTypes.has(file.type)) {
+    return { ok: false, message: "Upload a JPG, PNG, WebP, or GIF image." };
+  }
+  if (file.size > maxGalleryPhotoSize) {
+    return { ok: false, message: "Photos must be 8 MB or smaller." };
   }
 
-  const admin = createSupabaseAdminClient();
-  if (!admin) {
-    return;
-  }
-
-  const extension = file.name.split(".").pop() || "jpg";
-  const path = `${Date.now()}-${crypto.randomUUID()}.${extension}`;
-  const upload = await admin.storage.from("gallery").upload(path, file, { upsert: false });
+  const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+  const path = `${new Date().getFullYear()}/${crypto.randomUUID()}.${extension}`;
+  const supabase = await createSupabaseServerClient();
+  const upload = await supabase.storage.from(galleryBucket).upload(path, file, {
+    cacheControl: "31536000",
+    contentType: file.type,
+    upsert: false
+  });
   if (upload.error) {
-    return;
+    return { ok: false, message: `Photo upload failed: ${upload.error.message}` };
   }
 
-  const { data } = admin.storage.from("gallery").getPublicUrl(path);
-  await admin.from("gallery_photos").insert({
+  const { data } = supabase.storage.from(galleryBucket).getPublicUrl(path);
+  const insert = await supabase.from("gallery_photos").insert({
     storage_path: path,
     public_url: data.publicUrl,
-    alt_text: parsed.altText,
-    display_order: parsed.displayOrder
+    alt_text: parsed.data.altText,
+    display_order: parsed.data.displayOrder
   });
+  if (insert.error) {
+    await supabase.storage.from(galleryBucket).remove([path]);
+    return { ok: false, message: `Photo saved, but gallery metadata failed: ${insert.error.message}` };
+  }
 
   revalidatePath("/gallery");
   revalidatePath("/admin");
+  return { ok: true, message: "Photo uploaded to the gallery." };
 }
 
 export async function deleteGalleryPhotoAction(formData: FormData) {
@@ -202,13 +225,12 @@ export async function deleteGalleryPhotoAction(formData: FormData) {
 
   const id = formValue(formData, "id");
   const path = formValue(formData, "storagePath");
-  const admin = createSupabaseAdminClient();
-  if (!admin) return;
+  const supabase = await createSupabaseServerClient();
 
   if (path) {
-    await admin.storage.from("gallery").remove([path]);
+    await supabase.storage.from(galleryBucket).remove([path]);
   }
-  await admin.from("gallery_photos").delete().eq("id", id);
+  await supabase.from("gallery_photos").delete().eq("id", id);
   revalidatePath("/gallery");
   revalidatePath("/admin");
 }
