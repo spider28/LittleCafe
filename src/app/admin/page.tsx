@@ -107,7 +107,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           {data.reservations.map((reservation) => (
             <div key={reservation.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-crema p-3 text-sm">
               <span>
-                <strong>{reservation.title}</strong> - {new Date(reservation.starts_at).toLocaleString()} - Party of {reservation.party_size}
+                <strong>{reservation.title}</strong> - {new Date(reservation.starts_at).toLocaleString()} - {new Date(reservation.ends_at).toLocaleTimeString()} - Party of {reservation.party_size}
               </span>
               <form action={deleteReservationAction}>
                 <input type="hidden" name="id" value={reservation.id} />
