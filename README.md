@@ -10,7 +10,8 @@ Responsive cafe website built with Next.js, TypeScript, Supabase, Resend, and Ve
 - Weekly reservation calendar with Admin-managed reservation blocks.
 - Contact form that stores messages and emails Admin through Resend.
 - Waiver form with required agreements, typed signature, and Admin search.
-- V1 keeps OpenAI API and LangGraph as documented future chatbot architecture, without adding unused runtime dependencies.
+- Site-wide V1 chatbot powered by the OpenAI Responses API.
+- LangGraph remains the planned V2 path for stateful, step-by-step booking workflows.
 
 ## Getting Started
 
@@ -30,11 +31,13 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 RESEND_API_KEY=
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5.5
 ADMIN_EMAIL=
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-The app can render without these values for local UI review, but Supabase-backed forms, auth, uploads, and email require them.
+The app can render without these values for local UI review, but Supabase-backed forms, auth, uploads, email, and chatbot replies require their matching environment variables.
 
 ## Supabase Setup
 

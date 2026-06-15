@@ -3,6 +3,8 @@ export const env = {
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
+  openaiApiKey: process.env.OPENAI_API_KEY ?? "",
+  openaiModel: process.env.OPENAI_MODEL ?? "gpt-5.5",
   adminEmail: process.env.ADMIN_EMAIL ?? "",
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
 };

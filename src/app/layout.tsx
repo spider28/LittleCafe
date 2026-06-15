@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Chatbot } from "@/components/Chatbot";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { cafe } from "@/lib/content";
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <Header />
         <main>{children}</main>
         <Footer />
+        <Chatbot />
       </body>
     </html>
   );

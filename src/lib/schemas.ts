@@ -36,3 +36,12 @@ export const galleryUploadSchema = z.object({
   altText: z.string().trim().min(2),
   displayOrder: z.coerce.number().int().min(0).default(0)
 });
+
+export const chatMessageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().trim().min(1).max(1200)
+});
+
+export const chatRequestSchema = z.object({
+  messages: z.array(chatMessageSchema).min(1).max(12)
+});
