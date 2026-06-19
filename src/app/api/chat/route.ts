@@ -60,6 +60,33 @@ function cafeContext() {
   ].join("\n");
 }
 
+function logRateLimitHeaders(provider: "openai" | "github", response: Response) {
+  const expectedHeaders = [
+    "x-ratelimit-limit",
+    "x-ratelimit-remaining",
+    "x-ratelimit-reset",
+    "x-ratelimit-limit-requests",
+    "x-ratelimit-remaining-requests",
+    "x-ratelimit-reset-requests",
+    "x-ratelimit-limit-tokens",
+    "x-ratelimit-remaining-tokens",
+    "x-ratelimit-reset-tokens",
+    "retry-after"
+  ];
+  const matchingHeaders = Object.fromEntries(
+    Array.from(response.headers.entries()).filter(([name]) => {
+      const normalizedName = name.toLowerCase();
+      return normalizedName.includes("ratelimit") || normalizedName.includes("retry") || normalizedName.includes("request-id");
+    })
+  );
+
+  console.log(`[chat:${provider}] status`, response.status);
+  for (const header of expectedHeaders) {
+    console.log(`[chat:${provider}] ${header}`, response.headers.get(header));
+  }
+  console.log(`[chat:${provider}] matching headers`, matchingHeaders);
+}
+
 export async function POST(request: Request) {
   const settings = await getChatbotSettings();
   if (!settings.enabled) {
@@ -90,6 +117,8 @@ export async function POST(request: Request) {
       method: "POST",
       headers: {
         Authorization: `Bearer ${env.githubApiKey}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -107,6 +136,7 @@ export async function POST(request: Request) {
         max_tokens: 350
       })
     });
+    logRateLimitHeaders("github", response);
 
     const data = (await response.json().catch(() => ({}))) as ChatCompletionResponse;
 
@@ -148,6 +178,7 @@ export async function POST(request: Request) {
       max_output_tokens: 350
     })
   });
+  logRateLimitHeaders("openai", response);
 
   const data = (await response.json().catch(() => ({}))) as OpenAIResponse;
 

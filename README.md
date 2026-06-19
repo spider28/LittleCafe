@@ -36,7 +36,7 @@ OPENAI_END_POINT=https://api.openai.com/v1/responses
 OPENAI_MODEL=gpt-5.5
 GITHUB_API_KEY=
 GITHUB_END_POINT=https://models.github.ai/inference/chat/completions
-GITHUB_MODEL=gpt-5.5
+GITHUB_MODEL=openai/gpt-4.1-mini
 ADMIN_EMAIL=
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
