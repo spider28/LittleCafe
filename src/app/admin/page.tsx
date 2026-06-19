@@ -1,7 +1,9 @@
 import { Field } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
 import {
+  createChatbotKnowledgeAction,
   createReservationAction,
+  deleteChatbotKnowledgeAction,
   deleteGalleryPhotoAction,
   deleteReservationAction,
   signInAction,
@@ -101,6 +103,45 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </label>
             </fieldset>
           </ActionForm>
+        </Panel>
+
+        <Panel title="Chatbot knowledge">
+          <ActionForm action={createChatbotKnowledgeAction} buttonLabel="Add knowledge">
+            <Field name="title" label="Title" required />
+            <Field name="source" label="Source" placeholder="FAQ, menu, policy, event" />
+            <Field name="content" label="Content" textarea required />
+            <label className="flex items-center gap-3 text-sm font-medium text-ink">
+              <input
+                name="active"
+                type="checkbox"
+                defaultChecked
+                className="h-4 w-4 rounded border-black/20 text-roast focus:ring-roast"
+              />
+              Active
+            </label>
+          </ActionForm>
+
+          <div className="mt-6 grid gap-3">
+            {data.knowledge.map((item) => (
+              <article key={item.id} className="rounded-md bg-crema p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-ink">{item.title}</p>
+                    <p className="mt-1 text-xs uppercase tracking-wide text-ink/55">
+                      {item.source} · {item.active ? "active" : "inactive"}
+                    </p>
+                  </div>
+                  <form action={deleteChatbotKnowledgeAction}>
+                    <input type="hidden" name="id" value={item.id} />
+                    <button className="font-semibold text-berry" type="submit">
+                      Delete
+                    </button>
+                  </form>
+                </div>
+                <p className="mt-2 line-clamp-3 text-ink/70">{item.content}</p>
+              </article>
+            ))}
+          </div>
         </Panel>
 
         <Panel title="Gallery upload">

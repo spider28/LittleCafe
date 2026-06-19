@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { cafe } from "@/lib/content";
-import { contactSchema, galleryUploadSchema, reservationSchema, waiverSchema } from "@/lib/schemas";
+import { chatbotKnowledgeSchema, contactSchema, galleryUploadSchema, reservationSchema, waiverSchema } from "@/lib/schemas";
 
 describe("form schemas", () => {
   it("accepts a valid contact message", () => {
@@ -43,6 +43,17 @@ describe("form schemas", () => {
       galleryUploadSchema.safeParse({
         altText: "A sunny cafe table",
         displayOrder: "2"
+      }).success
+    ).toBe(true);
+  });
+
+  it("accepts chatbot knowledge chunks", () => {
+    expect(
+      chatbotKnowledgeSchema.safeParse({
+        title: "Waiver policy",
+        source: "FAQ",
+        content: "Guests should complete the waiver before attending private events.",
+        active: true
       }).success
     ).toBe(true);
   });

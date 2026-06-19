@@ -19,6 +19,30 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["site_settings"]["Insert"]>;
         Relationships: [];
       };
+      chatbot_knowledge_chunks: {
+        Row: {
+          id: string;
+          title: string;
+          content: string;
+          source: string;
+          active: boolean;
+          embedding: number[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          content: string;
+          source?: string;
+          active?: boolean;
+          embedding: number[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["chatbot_knowledge_chunks"]["Insert"]>;
+        Relationships: [];
+      };
       admin_profiles: {
         Row: { id: string; user_id: string; email: string; created_at: string };
         Insert: { id?: string; user_id: string; email: string; created_at?: string };
@@ -119,7 +143,22 @@ export type Database = {
       };
     };
     Views: {};
-    Functions: {};
+    Functions: {
+      match_chatbot_knowledge: {
+        Args: {
+          query_embedding: number[];
+          match_threshold?: number;
+          match_count?: number;
+        };
+        Returns: Array<{
+          id: string;
+          title: string;
+          content: string;
+          source: string;
+          similarity: number;
+        }>;
+      };
+    };
     Enums: {};
     CompositeTypes: {};
   };

@@ -34,9 +34,13 @@ RESEND_API_KEY=
 OPENAI_API_KEY=
 OPENAI_END_POINT=https://api.openai.com/v1/responses
 OPENAI_MODEL=gpt-5.5
+OPENAI_EMBEDDING_END_POINT=https://api.openai.com/v1/embeddings
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 GITHUB_API_KEY=
 GITHUB_END_POINT=https://models.github.ai/inference/chat/completions
 GITHUB_MODEL=openai/gpt-4.1-mini
+GITHUB_EMBEDDING_END_POINT=https://models.github.ai/inference/embeddings
+GITHUB_EMBEDDING_MODEL=openai/text-embedding-3-small
 ADMIN_EMAIL=
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
@@ -58,7 +62,11 @@ values ('AUTH_USER_UUID', 'admin@example.com');
 
 5. Set the same email in `ADMIN_EMAIL` if you also want the environment fallback and contact email recipient.
 
-The schema creates the `gallery` storage bucket, public gallery reads, public insert policies for waivers/contact messages, public-read/admin-managed site settings, and admin-only management policies for protected records.
+The schema creates the `gallery` storage bucket, public gallery reads, public insert policies for waivers/contact messages, public-read/admin-managed site settings, vector-backed chatbot knowledge, and admin-only management policies for protected records.
+
+## Chatbot RAG
+
+V2 chatbot RAG uses Supabase Postgres with `pgvector`. Add chatbot knowledge in Admin; each entry is embedded with the embedding model for the selected Admin chatbot provider and stored as `vector(1536)`. On each chat message, `/api/chat` embeds the latest user question, calls the `match_chatbot_knowledge` RPC, and sends the most relevant chunks to the selected chat provider.
 
 ## Scripts
 

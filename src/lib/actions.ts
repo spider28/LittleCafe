@@ -5,9 +5,11 @@ import { redirect } from "next/navigation";
 import { Resend } from "resend";
 import { cafe } from "./content";
 import { env, hasSupabaseEnv } from "./env";
-import { contactSchema, galleryUploadSchema, reservationSchema, waiverSchema } from "./schemas";
+import { chatbotKnowledgeSchema, contactSchema, galleryUploadSchema, reservationSchema, waiverSchema } from "./schemas";
 import { requireAdmin } from "./admin";
+import { getChatbotSettings } from "./data";
 import { createSupabaseServerClient } from "./supabase";
+import { createEmbedding } from "./rag";
 
 export type ActionState = { ok: boolean; message: string };
 
@@ -259,4 +261,53 @@ export async function updateChatbotSettingsAction(_state: ActionState, formData:
   revalidatePath("/");
   revalidatePath("/admin");
   return { ok: true, message: "Chatbot settings saved." };
+}
+
+export async function createChatbotKnowledgeAction(_state: ActionState, formData: FormData): Promise<ActionState> {
+  const { allowed } = await requireAdmin();
+  if (!allowed) redirect("/admin");
+
+  const parsed = chatbotKnowledgeSchema.safeParse({
+    title: formValue(formData, "title"),
+    source: formValue(formData, "source"),
+    content: formValue(formData, "content"),
+    active: formData.get("active") === "on"
+  });
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Please check the knowledge details." };
+  }
+
+  let embedding: number[];
+  try {
+    const settings = await getChatbotSettings();
+    embedding = await createEmbedding(`${parsed.data.title}\n\n${parsed.data.content}`, settings.provider);
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Embedding generation failed." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("chatbot_knowledge_chunks").insert({
+    title: parsed.data.title,
+    source: parsed.data.source || "admin",
+    content: parsed.data.content,
+    active: parsed.data.active,
+    embedding
+  });
+
+  if (error) {
+    return { ok: false, message: "Knowledge could not be saved. Make sure the latest Supabase schema has been applied." };
+  }
+
+  revalidatePath("/admin");
+  return { ok: true, message: "Knowledge added to chatbot retrieval." };
+}
+
+export async function deleteChatbotKnowledgeAction(formData: FormData) {
+  const { allowed } = await requireAdmin();
+  if (!allowed) redirect("/admin");
+
+  const supabase = await createSupabaseServerClient();
+  await supabase.from("chatbot_knowledge_chunks").delete().eq("id", formValue(formData, "id"));
+  revalidatePath("/admin");
 }

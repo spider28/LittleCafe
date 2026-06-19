@@ -37,6 +37,13 @@ export const galleryUploadSchema = z.object({
   displayOrder: z.coerce.number().int().min(0).default(0)
 });
 
+export const chatbotKnowledgeSchema = z.object({
+  title: z.string().trim().min(2, "Enter a short title.").max(120, "Keep the title under 120 characters."),
+  source: z.string().trim().max(120, "Keep the source under 120 characters.").optional(),
+  content: z.string().trim().min(20, "Add at least 20 characters of knowledge.").max(4000, "Keep each knowledge chunk under 4000 characters."),
+  active: z.boolean().default(true)
+});
+
 export const chatMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().trim().min(1).max(1200)

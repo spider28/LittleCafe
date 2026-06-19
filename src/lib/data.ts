@@ -74,8 +74,9 @@ export async function getWeeklyReservations() {
 
 export async function getAdminCollections(query?: { waiver?: string; date?: string }) {
   const supabase = await createSupabaseServerClient();
-  const [settings, gallery, reservations, contacts] = await Promise.all([
+  const [settings, knowledge, gallery, reservations, contacts] = await Promise.all([
     getChatbotSettings(),
+    supabase.from("chatbot_knowledge_chunks").select("id,title,source,content,active,created_at").order("created_at", { ascending: false }).limit(20),
     supabase.from("gallery_photos").select("*").order("display_order"),
     supabase.from("reservations").select("*").order("starts_at", { ascending: false }).limit(20),
     supabase.from("contact_messages").select("*").order("created_at", { ascending: false }).limit(20)
@@ -96,6 +97,7 @@ export async function getAdminCollections(query?: { waiver?: string; date?: stri
 
   return {
     settings,
+    knowledge: knowledge.data ?? [],
     gallery: gallery.data ?? [],
     reservations: reservations.data ?? [],
     contacts: contacts.data ?? [],

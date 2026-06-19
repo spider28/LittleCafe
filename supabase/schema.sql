@@ -1,4 +1,5 @@
 create extension if not exists "pgcrypto";
+create extension if not exists vector with schema extensions;
 
 create table if not exists public.site_settings (
   id text primary key,
@@ -7,6 +8,21 @@ create table if not exists public.site_settings (
   updated_at timestamptz not null default now(),
   check (id = 'global')
 );
+
+create table if not exists public.chatbot_knowledge_chunks (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  content text not null,
+  source text not null default 'admin',
+  active boolean not null default true,
+  embedding extensions.vector(1536) not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists chatbot_knowledge_chunks_embedding_idx
+on public.chatbot_knowledge_chunks
+using hnsw (embedding extensions.vector_cosine_ops);
 
 create table if not exists public.admin_profiles (
   id uuid primary key default gen_random_uuid(),
@@ -60,6 +76,7 @@ create table if not exists public.contact_messages (
 
 alter table public.admin_profiles enable row level security;
 alter table public.site_settings enable row level security;
+alter table public.chatbot_knowledge_chunks enable row level security;
 alter table public.gallery_photos enable row level security;
 alter table public.reservations enable row level security;
 alter table public.waiver_submissions enable row level security;
@@ -94,6 +111,46 @@ on public.site_settings for all
 to authenticated
 using (public.is_admin())
 with check (public.is_admin());
+
+drop policy if exists "Admins manage chatbot knowledge" on public.chatbot_knowledge_chunks;
+create policy "Admins manage chatbot knowledge"
+on public.chatbot_knowledge_chunks for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create or replace function public.match_chatbot_knowledge(
+  query_embedding extensions.vector(1536),
+  match_threshold double precision default 0.72,
+  match_count integer default 5
+)
+returns table (
+  id uuid,
+  title text,
+  content text,
+  source text,
+  similarity double precision
+)
+language sql
+stable
+security definer
+set search_path = public, extensions
+as $$
+  select
+    chunk.id,
+    chunk.title,
+    chunk.content,
+    chunk.source,
+    1 - (chunk.embedding <=> query_embedding) as similarity
+  from public.chatbot_knowledge_chunks as chunk
+  where
+    chunk.active
+    and 1 - (chunk.embedding <=> query_embedding) >= match_threshold
+  order by chunk.embedding <=> query_embedding
+  limit least(match_count, 10);
+$$;
+
+grant execute on function public.match_chatbot_knowledge(extensions.vector, double precision, integer) to anon, authenticated;
 
 drop policy if exists "Admins can read admin profiles" on public.admin_profiles;
 create policy "Admins can read admin profiles"

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cafe, menuSections, pricing } from "@/lib/content";
 import { getChatbotSettings } from "@/lib/data";
 import { env } from "@/lib/env";
+import { formatKnowledgeMatches, matchChatbotKnowledge } from "@/lib/rag";
 import { chatRequestSchema } from "@/lib/schemas";
 
 export const runtime = "nodejs";
@@ -101,9 +102,19 @@ export async function POST(request: Request) {
   }
 
   const recentMessages = parsed.data.messages.slice(-8);
+  const latestUserMessage = [...recentMessages].reverse().find((message) => message.role === "user")?.content ?? "";
+  const knowledgeMatches = latestUserMessage ? await matchChatbotKnowledge(latestUserMessage, settings.provider) : [];
+  const retrievedKnowledge = formatKnowledgeMatches(knowledgeMatches);
+  const context = [
+    retrievedKnowledge ? `Retrieved chatbot knowledge:\n${retrievedKnowledge}` : "",
+    `Base cafe information:\n${cafeContext()}`
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   const instructions = [
     "You are LittleCafe's helpful website chatbot.",
-    "Answer briefly and warmly using the provided cafe information.",
+    "Answer briefly and warmly using the provided cafe information and retrieved chatbot knowledge.",
+    "Treat retrieved chatbot knowledge as the most specific source when it is relevant to the guest's question.",
     "If guests ask to book, change, or cancel a reservation, tell them this first version can answer questions and that staff can help through the Contact page or phone.",
     "Do not invent policies, availability, private events, allergens, or reservations."
   ].join(" ");
@@ -126,7 +137,7 @@ export async function POST(request: Request) {
         messages: [
           {
             role: "system",
-            content: `${instructions}\n\nCafe information:\n${cafeContext()}`
+            content: `${instructions}\n\n${context}`
           },
           ...recentMessages.map((message) => ({
             role: message.role,
@@ -168,7 +179,7 @@ export async function POST(request: Request) {
       input: [
         {
           role: "developer",
-          content: cafeContext()
+          content: context
         },
         ...recentMessages.map((message) => ({
           role: message.role,
