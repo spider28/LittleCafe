@@ -2,6 +2,37 @@ import { unstable_noStore as noStore } from "next/cache";
 import { fallbackGallery } from "./content";
 import { createSupabaseServerClient } from "./supabase";
 
+export type ChatbotProvider = "openai" | "github";
+
+export type ChatbotSettings = {
+  enabled: boolean;
+  provider: ChatbotProvider;
+};
+
+export const defaultChatbotSettings: ChatbotSettings = {
+  enabled: true,
+  provider: "openai"
+};
+
+export async function getChatbotSettings(): Promise<ChatbotSettings> {
+  noStore();
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("site_settings")
+    .select("chatbot_enabled, chatbot_provider")
+    .eq("id", "global")
+    .maybeSingle();
+
+  if (error || !data) {
+    return defaultChatbotSettings;
+  }
+
+  return {
+    enabled: data.chatbot_enabled,
+    provider: data.chatbot_provider
+  };
+}
+
 export async function getGalleryPhotos() {
   noStore();
   const supabase = await createSupabaseServerClient();
@@ -43,7 +74,8 @@ export async function getWeeklyReservations() {
 
 export async function getAdminCollections(query?: { waiver?: string; date?: string }) {
   const supabase = await createSupabaseServerClient();
-  const [gallery, reservations, contacts] = await Promise.all([
+  const [settings, gallery, reservations, contacts] = await Promise.all([
+    getChatbotSettings(),
     supabase.from("gallery_photos").select("*").order("display_order"),
     supabase.from("reservations").select("*").order("starts_at", { ascending: false }).limit(20),
     supabase.from("contact_messages").select("*").order("created_at", { ascending: false }).limit(20)
@@ -63,6 +95,7 @@ export async function getAdminCollections(query?: { waiver?: string; date?: stri
   const waivers = await waiverQuery;
 
   return {
+    settings,
     gallery: gallery.data ?? [],
     reservations: reservations.data ?? [],
     contacts: contacts.data ?? [],

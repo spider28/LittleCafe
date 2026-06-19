@@ -1,5 +1,13 @@
 create extension if not exists "pgcrypto";
 
+create table if not exists public.site_settings (
+  id text primary key,
+  chatbot_enabled boolean not null default true,
+  chatbot_provider text not null default 'openai' check (chatbot_provider in ('openai', 'github')),
+  updated_at timestamptz not null default now(),
+  check (id = 'global')
+);
+
 create table if not exists public.admin_profiles (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null unique references auth.users(id) on delete cascade,
@@ -51,6 +59,7 @@ create table if not exists public.contact_messages (
 );
 
 alter table public.admin_profiles enable row level security;
+alter table public.site_settings enable row level security;
 alter table public.gallery_photos enable row level security;
 alter table public.reservations enable row level security;
 alter table public.waiver_submissions enable row level security;
@@ -68,6 +77,23 @@ as $$
     where user_id = auth.uid()
   );
 $$;
+
+insert into public.site_settings (id, chatbot_enabled, chatbot_provider)
+values ('global', true, 'openai')
+on conflict (id) do nothing;
+
+drop policy if exists "Public can read site settings" on public.site_settings;
+create policy "Public can read site settings"
+on public.site_settings for select
+to anon, authenticated
+using (id = 'global');
+
+drop policy if exists "Admins manage site settings" on public.site_settings;
+create policy "Admins manage site settings"
+on public.site_settings for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "Admins can read admin profiles" on public.admin_profiles;
 create policy "Admins can read admin profiles"

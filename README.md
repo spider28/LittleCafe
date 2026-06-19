@@ -32,12 +32,17 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 RESEND_API_KEY=
 OPENAI_API_KEY=
+OPENAI_END_POINT=https://api.openai.com/v1/responses
 OPENAI_MODEL=gpt-5.5
+GITHUB_API_KEY=
+GITHUB_END_POINT=https://models.github.ai/inference/chat/completions
+GITHUB_MODEL=gpt-5.5
 ADMIN_EMAIL=
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
 The app can render without these values for local UI review, but Supabase-backed forms, auth, uploads, email, and chatbot replies require their matching environment variables.
+Chatbot provider selection is managed in Admin; provider API keys, endpoints, and models stay in environment variables.
 
 ## Supabase Setup
 
@@ -53,7 +58,7 @@ values ('AUTH_USER_UUID', 'admin@example.com');
 
 5. Set the same email in `ADMIN_EMAIL` if you also want the environment fallback and contact email recipient.
 
-The schema creates the `gallery` storage bucket, public gallery reads, public insert policies for waivers/contact messages, and admin-only management policies for protected records.
+The schema creates the `gallery` storage bucket, public gallery reads, public insert policies for waivers/contact messages, public-read/admin-managed site settings, and admin-only management policies for protected records.
 
 ## Scripts
 

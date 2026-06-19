@@ -234,3 +234,29 @@ export async function deleteGalleryPhotoAction(formData: FormData) {
   revalidatePath("/gallery");
   revalidatePath("/admin");
 }
+
+export async function updateChatbotSettingsAction(_state: ActionState, formData: FormData): Promise<ActionState> {
+  const { allowed } = await requireAdmin();
+  if (!allowed) redirect("/admin");
+
+  const provider = formValue(formData, "provider");
+  if (provider !== "openai" && provider !== "github") {
+    return { ok: false, message: "Choose OpenAI or GitHub as the chatbot provider." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("site_settings").upsert({
+    id: "global",
+    chatbot_enabled: formData.get("enabled") === "on",
+    chatbot_provider: provider,
+    updated_at: new Date().toISOString()
+  });
+
+  if (error) {
+    return { ok: false, message: "Chatbot settings could not be saved. Make sure the latest Supabase schema has been applied." };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  return { ok: true, message: "Chatbot settings saved." };
+}

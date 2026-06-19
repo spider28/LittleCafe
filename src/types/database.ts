@@ -3,6 +3,22 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      site_settings: {
+        Row: {
+          id: "global";
+          chatbot_enabled: boolean;
+          chatbot_provider: "openai" | "github";
+          updated_at: string;
+        };
+        Insert: {
+          id?: "global";
+          chatbot_enabled?: boolean;
+          chatbot_provider?: "openai" | "github";
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["site_settings"]["Insert"]>;
+        Relationships: [];
+      };
       admin_profiles: {
         Row: { id: string; user_id: string; email: string; created_at: string };
         Insert: { id?: string; user_id: string; email: string; created_at?: string };

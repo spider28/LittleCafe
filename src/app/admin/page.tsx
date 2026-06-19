@@ -6,11 +6,13 @@ import {
   deleteReservationAction,
   signInAction,
   signOutAction,
+  updateChatbotSettingsAction,
   uploadGalleryPhotoAction
 } from "@/lib/actions";
 import { requireAdmin } from "@/lib/admin";
 import { getAdminCollections } from "@/lib/data";
 import { ActionForm } from "@/components/ActionForm";
+import { env } from "@/lib/env";
 
 export const metadata = { title: "Admin" };
 
@@ -53,6 +55,54 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <Panel title="Chatbot settings">
+          <ActionForm action={updateChatbotSettingsAction} buttonLabel="Save chatbot settings">
+            <label className="flex items-center gap-3 text-sm font-medium text-ink">
+              <input
+                name="enabled"
+                type="checkbox"
+                defaultChecked={data.settings.enabled}
+                className="h-4 w-4 rounded border-black/20 text-roast focus:ring-roast"
+              />
+              Enable chatbot
+            </label>
+
+            <fieldset className="grid gap-3">
+              <legend className="text-sm font-medium text-ink">Provider</legend>
+              <label className="flex items-start gap-3 rounded-md border border-black/10 bg-crema p-3 text-sm">
+                <input
+                  name="provider"
+                  type="radio"
+                  value="openai"
+                  defaultChecked={data.settings.provider === "openai"}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block font-semibold text-ink">OpenAI</span>
+                  <span className="block text-ink/65">
+                    Model: {env.openaiModel || "not set"} · Endpoint: {env.openaiEndPoint || "default Responses API"}
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 rounded-md border border-black/10 bg-crema p-3 text-sm">
+                <input
+                  name="provider"
+                  type="radio"
+                  value="github"
+                  defaultChecked={data.settings.provider === "github"}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block font-semibold text-ink">GitHub Models</span>
+                  <span className="block text-ink/65">
+                    Model: {env.githubModel || "not set"} · Endpoint: {env.githubEndPoint || "not set"}
+                  </span>
+                </span>
+              </label>
+            </fieldset>
+          </ActionForm>
+        </Panel>
+
         <Panel title="Gallery upload">
           <ActionForm action={uploadGalleryPhotoAction} buttonLabel="Upload photo">
             <Field name="altText" label="Alt text" required />
