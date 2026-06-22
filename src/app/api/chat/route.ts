@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { cafe, menuSections, pricing } from "@/lib/content";
+import { getChatThreadState, saveChatThreadState } from "@/lib/chat-thread-store";
+import { runChatWorkflow } from "@/lib/chat-workflow";
 import { getChatbotSettings } from "@/lib/data";
 import { env } from "@/lib/env";
 import { formatKnowledgeMatches, matchChatbotKnowledge } from "@/lib/rag";
@@ -103,6 +105,17 @@ export async function POST(request: Request) {
 
   const recentMessages = parsed.data.messages.slice(-8);
   const latestUserMessage = [...recentMessages].reverse().find((message) => message.role === "user")?.content ?? "";
+  const threadState = parsed.data.sessionId ? await getChatThreadState(parsed.data.sessionId) : {};
+  const workflow = latestUserMessage ? await runChatWorkflow({ message: latestUserMessage, snapshot: threadState }) : null;
+
+  if (parsed.data.sessionId && workflow) {
+    await saveChatThreadState(parsed.data.sessionId, workflow.state);
+  }
+
+  if (workflow?.route === "party" && workflow.reply) {
+    return NextResponse.json({ reply: workflow.reply });
+  }
+
   const knowledgeMatches = latestUserMessage ? await matchChatbotKnowledge(latestUserMessage, settings.provider) : [];
   const retrievedKnowledge = formatKnowledgeMatches(knowledgeMatches);
   const context = [

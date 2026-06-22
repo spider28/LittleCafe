@@ -20,6 +20,14 @@ create table if not exists public.chatbot_knowledge_chunks (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.chatbot_threads (
+  session_id text primary key,
+  state jsonb not null default '{}',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  expires_at timestamptz
+);
+
 create index if not exists chatbot_knowledge_chunks_embedding_idx
 on public.chatbot_knowledge_chunks
 using hnsw (embedding extensions.vector_cosine_ops);
@@ -77,6 +85,7 @@ create table if not exists public.contact_messages (
 alter table public.admin_profiles enable row level security;
 alter table public.site_settings enable row level security;
 alter table public.chatbot_knowledge_chunks enable row level security;
+alter table public.chatbot_threads enable row level security;
 alter table public.gallery_photos enable row level security;
 alter table public.reservations enable row level security;
 alter table public.waiver_submissions enable row level security;
@@ -115,6 +124,13 @@ with check (public.is_admin());
 drop policy if exists "Admins manage chatbot knowledge" on public.chatbot_knowledge_chunks;
 create policy "Admins manage chatbot knowledge"
 on public.chatbot_knowledge_chunks for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Admins manage chatbot threads" on public.chatbot_threads;
+create policy "Admins manage chatbot threads"
+on public.chatbot_threads for all
 to authenticated
 using (public.is_admin())
 with check (public.is_admin());

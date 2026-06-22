@@ -12,9 +12,22 @@ type ChatMessage = {
 const starterMessages: ChatMessage[] = [
   {
     role: "assistant",
-    content: "Hi, I can help with LittleCafe hours, menu highlights, events, and contact details."
+    content: "Hi, I can help with LittleCafe hours, menu highlights, events, contact details, and party planning."
   }
 ];
+const maxRequestMessages = 10;
+
+function getChatbotSessionId() {
+  const storageKey = "littlecafe-chat-session";
+  const existing = window.localStorage.getItem(storageKey);
+  if (existing) {
+    return existing;
+  }
+
+  const next = crypto.randomUUID();
+  window.localStorage.setItem(storageKey, next);
+  return next;
+}
 
 export function Chatbot() {
   const [open, setOpen] = useState(false);
@@ -41,7 +54,7 @@ export function Chatbot() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages })
+        body: JSON.stringify({ sessionId: getChatbotSessionId(), messages: nextMessages.slice(-maxRequestMessages) })
       });
       const data = (await response.json()) as { reply?: string; error?: string };
 
@@ -72,7 +85,7 @@ export function Chatbot() {
               </span>
               <div className="min-w-0">
                 <h2 className="truncate text-sm font-semibold text-ink">LittleCafe chat</h2>
-                <p className="truncate text-xs text-ink/65">V1 assistant</p>
+                <p className="truncate text-xs text-ink/65">Planning assistant</p>
               </div>
             </div>
             <button

@@ -50,5 +50,6 @@ export const chatMessageSchema = z.object({
 });
 
 export const chatRequestSchema = z.object({
-  messages: z.array(chatMessageSchema).min(1).max(12)
+  sessionId: z.string().trim().min(8).max(120).optional(),
+  messages: z.array(chatMessageSchema).min(1).max(16)
 });

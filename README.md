@@ -11,7 +11,8 @@ Responsive cafe website built with Next.js, TypeScript, Supabase, Resend, and Ve
 - Contact form that stores messages and emails Admin through Resend.
 - Waiver form with required agreements, typed signature, and Admin search.
 - Site-wide V1 chatbot powered by the OpenAI Responses API.
-- LangGraph remains the planned V2 path for stateful, step-by-step booking workflows.
+- RAG chatbot knowledge with Supabase `pgvector`.
+- LangGraph-powered party planning workflow with persisted chatbot thread state.
 
 ## Getting Started
 
@@ -67,6 +68,45 @@ The schema creates the `gallery` storage bucket, public gallery reads, public in
 ## Chatbot RAG
 
 V2 chatbot RAG uses Supabase Postgres with `pgvector`. Add chatbot knowledge in Admin; each entry is embedded with the embedding model for the selected Admin chatbot provider and stored as `vector(1536)`. On each chat message, `/api/chat` embeds the latest user question, calls the `match_chatbot_knowledge` RPC, and sends the most relevant chunks to the selected chat provider.
+
+## LangGraph Chatbot Workflow
+
+The chatbot uses LangGraph for stateful party-planning conversations. The browser sends a stable session ID, `/api/chat` loads the thread state from Supabase, and LangGraph updates the party-planning state across turns. Normal FAQ questions still use RAG plus the selected OpenAI/GitHub chat provider.
+
+## Chatbot Prompt Examples
+
+Use short FAQ-style prompts to test RAG:
+
+```text
+What are your hours this weekend?
+What menu items do you recommend for kids?
+Do I need to sign a waiver?
+What event packages do you offer?
+```
+
+Use multi-turn prompts to test the LangGraph party-planning workflow:
+
+```text
+I want to have a party in this cafe, around 20 persons, Saturday or Sunday afternoon, $500 budget, a beverage for each kid, some snacks.
+```
+
+Then answer the follow-up questions:
+
+```text
+Contact name: Mike Wang. Contact phone: 352-870-7573.
+```
+
+Confirm after the chatbot summarizes the details:
+
+```text
+Yes, that looks good. Please confirm.
+```
+
+Reset the workflow state when testing a new scenario:
+
+```text
+Start over.
+```
 
 ## Scripts
 

@@ -43,6 +43,24 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["chatbot_knowledge_chunks"]["Insert"]>;
         Relationships: [];
       };
+      chatbot_threads: {
+        Row: {
+          session_id: string;
+          state: Json;
+          created_at: string;
+          updated_at: string;
+          expires_at: string | null;
+        };
+        Insert: {
+          session_id: string;
+          state?: Json;
+          created_at?: string;
+          updated_at?: string;
+          expires_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["chatbot_threads"]["Insert"]>;
+        Relationships: [];
+      };
       admin_profiles: {
         Row: { id: string; user_id: string; email: string; created_at: string };
         Insert: { id?: string; user_id: string; email: string; created_at?: string };
