@@ -42,12 +42,18 @@ GITHUB_END_POINT=https://models.github.ai/inference/chat/completions
 GITHUB_MODEL=openai/gpt-4.1-mini
 GITHUB_EMBEDDING_END_POINT=https://models.github.ai/inference/embeddings
 GITHUB_EMBEDDING_MODEL=openai/text-embedding-3-small
+LANGSMITH_API_KEY=
+LANGSMITH_TRACING=false
+LANGSMITH_PROJECT=littlecafe
+LANGSMITH_TRACING_BACKGROUND=false
+LANGCHAIN_CALLBACKS_BACKGROUND=false
 ADMIN_EMAIL=
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
 The app can render without these values for local UI review, but Supabase-backed forms, auth, uploads, email, and chatbot replies require their matching environment variables.
 Chatbot provider selection is managed in Admin; provider API keys, endpoints, and models stay in environment variables.
+Set `LANGSMITH_TRACING=true` with a `LANGSMITH_API_KEY` to trace chatbot workflows, model calls, embeddings, and token usage in LangSmith.
 
 ## Supabase Setup
 

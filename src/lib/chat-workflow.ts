@@ -43,7 +43,7 @@ const ChatWorkflowAnnotation = Annotation.Root({
 type ChatWorkflowState = typeof ChatWorkflowAnnotation.State;
 
 function isResetMessage(message: string) {
-  return /\b(cancel|reset|start over|never mind|nevermind)\b/i.test(message);
+  return /\b(cancel|reset|start\s*over|restart|clear|forget|never mind|nevermind)\b/i.test(message);
 }
 
 function isConfirmationMessage(message: string) {
@@ -52,6 +52,12 @@ function isConfirmationMessage(message: string) {
 
 function isPartyMessage(message: string, snapshot: WorkflowStateSnapshot) {
   if (snapshot.party?.active) {
+    if (snapshot.party.confirmed) {
+      return /\b(party|event|private event|birthday|group|reservation|reserve|book|booking|appointment|change|update|edit|guest|guests|people|persons|kids|children|budget|date|day|time|snack|snacks|beverage|beverages|drink|drinks|phone|contact)\b/i.test(
+        message
+      );
+    }
+
     return true;
   }
 
@@ -60,16 +66,18 @@ function isPartyMessage(message: string, snapshot: WorkflowStateSnapshot) {
 
 function extractPartyDetails(message: string, existing: PartyPlanningState = {}): PartyPlanningState {
   const next: PartyPlanningState = { ...existing, active: true };
+  const previous = { ...next };
   const lower = message.toLowerCase();
   const partySizeMatch = lower.match(/\b(?:around|about|for)?\s*(\d{1,2})\s*(?:people|persons|guests|kids|children|ppl)\b/);
+  const partySizeChangeMatch = lower.match(/\b(?:guest|guests|people|persons|party size|group size|number)\b.*?\b(?:to|from\s+\d{1,2}\s+to)\s*(\d{1,2})\b/);
   const budgetMatch = lower.match(/\$\s*(\d{2,5})\b|\b(\d{2,5})\s*(?:dollar|dollars|usd)\b/);
   const exactDateMatch = lower.match(/\b(?:\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{2}-\d{2})\b/);
   const contactNameMatch = message.match(/\b(?:contact\s+name|name)\s*(?:is|:)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})/i);
   const contactPhoneMatch = message.match(/\b(?:contact\s+phone|phone|tel|telephone)\s*(?:is|:)?\s*([+()\-.\s\d]{7,24})/i);
   const loosePhoneMatch = message.match(/\b(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}\b/);
 
-  if (partySizeMatch?.[1]) {
-    next.partySize = Number(partySizeMatch[1]);
+  if (partySizeChangeMatch?.[1] || partySizeMatch?.[1]) {
+    next.partySize = Number(partySizeChangeMatch?.[1] ?? partySizeMatch?.[1]);
   }
   if (budgetMatch?.[1] || budgetMatch?.[2]) {
     next.budget = Number(budgetMatch[1] ?? budgetMatch[2]);
@@ -100,6 +108,21 @@ function extractPartyDetails(message: string, existing: PartyPlanningState = {})
   }
   if (/\b(no snacks|without snacks)\b/i.test(lower)) {
     next.snacks = false;
+  }
+
+  const changedDetails =
+    next.partySize !== previous.partySize ||
+    next.dayPreference !== previous.dayPreference ||
+    next.timePreference !== previous.timePreference ||
+    next.budget !== previous.budget ||
+    next.beveragesForKids !== previous.beveragesForKids ||
+    next.snacks !== previous.snacks ||
+    next.exactDate !== previous.exactDate ||
+    next.contactName !== previous.contactName ||
+    next.contactPhone !== previous.contactPhone;
+
+  if (changedDetails && !isConfirmationMessage(message)) {
+    next.confirmed = false;
   }
 
   return next;

@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "./supabase";
 import { env } from "./env";
+import { createTracedModelJsonFetch, createUsageMetadata } from "./langsmith";
 import type { ChatbotProvider } from "./data";
 
 export type ChatbotKnowledgeMatch = {
@@ -12,6 +13,10 @@ export type ChatbotKnowledgeMatch = {
 
 type EmbeddingResponse = {
   data?: Array<{ embedding?: number[] }>;
+  usage?: {
+    prompt_tokens?: number;
+    total_tokens?: number;
+  };
   error?: { message?: string };
 };
 
@@ -29,7 +34,20 @@ export async function createEmbedding(input: string, provider: ChatbotProvider) 
     throw new Error(`${providerName} embeddings are not configured yet. Add ${isGitHub ? "GITHUB_API_KEY" : "OPENAI_API_KEY"} to .env.local.`);
   }
 
-  const response = await fetch(endpoint, {
+  const fetchEmbedding = createTracedModelJsonFetch<EmbeddingResponse>({
+    name: `${providerName} Embeddings`,
+    provider: isGitHub ? "github" : "openai",
+    model,
+    modelType: "llm",
+    processOutputs: (outputs) => ({
+      status: outputs.status,
+      ok: outputs.ok,
+      embedding_count: outputs.data.data?.length ?? 0,
+      embedding_dimensions: outputs.data.data?.[0]?.embedding?.length ?? 0,
+      usage_metadata: createUsageMetadata(outputs.data.usage)
+    })
+  });
+  const response = await fetchEmbedding(endpoint, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -47,7 +65,7 @@ export async function createEmbedding(input: string, provider: ChatbotProvider) 
     })
   });
 
-  const data = (await response.json().catch(() => ({}))) as EmbeddingResponse;
+  const data = response.data;
   if (!response.ok) {
     throw new Error(data.error?.message ?? "Embedding generation failed.");
   }

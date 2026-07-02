@@ -4,6 +4,7 @@ import { getChatThreadState, saveChatThreadState } from "@/lib/chat-thread-store
 import { runChatWorkflow } from "@/lib/chat-workflow";
 import { getChatbotSettings } from "@/lib/data";
 import { env } from "@/lib/env";
+import { createTracedModelJsonFetch } from "@/lib/langsmith";
 import { formatKnowledgeMatches, matchChatbotKnowledge } from "@/lib/rag";
 import { chatRequestSchema } from "@/lib/schemas";
 
@@ -17,11 +18,21 @@ type OpenAIOutputItem = {
 type OpenAIResponse = {
   output_text?: string;
   output?: OpenAIOutputItem[];
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+  };
   error?: { message?: string };
 };
 
 type ChatCompletionResponse = {
   choices?: Array<{ message?: { content?: string } }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
   error?: { message?: string };
 };
 
@@ -63,7 +74,7 @@ function cafeContext() {
   ].join("\n");
 }
 
-function logRateLimitHeaders(provider: "openai" | "github", response: Response) {
+function logRateLimitHeaders(provider: "openai" | "github", response: Pick<Response, "headers" | "status">) {
   const expectedHeaders = [
     "x-ratelimit-limit",
     "x-ratelimit-remaining",
@@ -137,7 +148,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "GitHub Models is not configured yet. Add GITHUB_API_KEY to .env.local." }, { status: 503 });
     }
 
-    const response = await fetch(env.githubEndPoint, {
+    const fetchGithubChat = createTracedModelJsonFetch<ChatCompletionResponse>({
+      name: "GitHub Models Chat Completion",
+      provider: "github",
+      model: env.githubModel
+    });
+    const response = await fetchGithubChat(env.githubEndPoint, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${env.githubApiKey}`,
@@ -162,7 +178,7 @@ export async function POST(request: Request) {
     });
     logRateLimitHeaders("github", response);
 
-    const data = (await response.json().catch(() => ({}))) as ChatCompletionResponse;
+    const data = response.data;
 
     if (!response.ok) {
       return NextResponse.json({ error: data.error?.message ?? "The chatbot could not answer right now." }, { status: response.status });
@@ -180,7 +196,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "OpenAI is not configured yet. Add OPENAI_API_KEY to .env.local." }, { status: 503 });
   }
 
-  const response = await fetch(env.openaiEndPoint, {
+  const fetchOpenAIResponse = createTracedModelJsonFetch<OpenAIResponse>({
+    name: "OpenAI Responses",
+    provider: "openai",
+    model: env.openaiModel
+  });
+  const response = await fetchOpenAIResponse(env.openaiEndPoint, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${env.openaiApiKey}`,
@@ -204,7 +225,7 @@ export async function POST(request: Request) {
   });
   logRateLimitHeaders("openai", response);
 
-  const data = (await response.json().catch(() => ({}))) as OpenAIResponse;
+  const data = response.data;
 
   if (!response.ok) {
     return NextResponse.json({ error: data.error?.message ?? "The chatbot could not answer right now." }, { status: response.status });

@@ -44,4 +44,75 @@ describe("chat workflow", () => {
     expect(result.state.party?.confirmed).toBe(true);
     expect(result.reply).toContain("confirmed");
   });
+
+  it("clears party state with compact startover wording", async () => {
+    const result = await runChatWorkflow({
+      message: "I want to startover, forget my previous information.",
+      snapshot: {
+        party: {
+          active: true,
+          confirmed: true,
+          partySize: 20,
+          dayPreference: "Saturday or Sunday",
+          timePreference: "afternoon",
+          budget: 500,
+          beveragesForKids: true,
+          snacks: true,
+          contactName: "Mike Wang",
+          contactPhone: "352-870-7573"
+        }
+      }
+    });
+
+    expect(result.state.party).toBeUndefined();
+    expect(result.reply).toContain("cleared");
+  });
+
+  it("reopens confirmed party details when the guest count changes", async () => {
+    const result = await runChatWorkflow({
+      message: "I want to change the guest number from 20 to 15",
+      snapshot: {
+        party: {
+          active: true,
+          confirmed: true,
+          partySize: 20,
+          dayPreference: "Saturday or Sunday",
+          timePreference: "afternoon",
+          budget: 500,
+          beveragesForKids: true,
+          snacks: true,
+          contactName: "Mike Wang",
+          contactPhone: "352-870-7573"
+        }
+      }
+    });
+
+    expect(result.state.party?.partySize).toBe(15);
+    expect(result.state.party?.confirmed).toBe(false);
+    expect(result.reply).toContain("15 guests");
+    expect(result.reply).toContain("please confirm");
+  });
+
+  it("lets confirmed party threads answer unrelated FAQ questions", async () => {
+    const result = await runChatWorkflow({
+      message: "Tell me the services you have in this store.",
+      snapshot: {
+        party: {
+          active: true,
+          confirmed: true,
+          partySize: 20,
+          dayPreference: "Saturday or Sunday",
+          timePreference: "afternoon",
+          budget: 500,
+          beveragesForKids: true,
+          snacks: true,
+          contactName: "Mike Wang",
+          contactPhone: "352-870-7573"
+        }
+      }
+    });
+
+    expect(result.route).toBe("faq");
+    expect(result.reply).toBeUndefined();
+  });
 });
