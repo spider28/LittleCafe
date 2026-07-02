@@ -10,6 +10,7 @@ Responsive cafe website built with Next.js, TypeScript, Supabase, Resend, and Ve
 - Weekly reservation calendar with Admin-managed reservation blocks.
 - Contact form that stores messages and emails Admin through Resend.
 - Waiver form with required agreements, typed signature, and Admin search.
+- Server-side visit tracking with an Admin-only visits page.
 - Site-wide V1 chatbot powered by the OpenAI Responses API.
 - RAG chatbot knowledge with Supabase `pgvector`.
 - LangGraph-powered party planning workflow with persisted chatbot thread state.
@@ -69,7 +70,7 @@ values ('AUTH_USER_UUID', 'admin@example.com');
 
 5. Set the same email in `ADMIN_EMAIL` if you also want the environment fallback and contact email recipient.
 
-The schema creates the `gallery` storage bucket, public gallery reads, public insert policies for waivers/contact messages, public-read/admin-managed site settings, vector-backed chatbot knowledge, and admin-only management policies for protected records.
+The schema creates the `gallery` storage bucket, public gallery reads, public insert policies for waivers/contact messages, public-read/admin-managed site settings, vector-backed chatbot knowledge, server-side website visit logging, and admin-only management policies for protected records.
 
 ## Chatbot RAG
 

@@ -82,6 +82,30 @@ create table if not exists public.contact_messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.website_visits (
+  id uuid primary key default gen_random_uuid(),
+  visited_at timestamptz not null default now(),
+  path text not null,
+  search text,
+  referrer text,
+  host text,
+  ip_address inet,
+  country text,
+  region text,
+  city text,
+  user_agent text,
+  browser text,
+  os text,
+  device_type text,
+  is_bot boolean not null default false
+);
+
+create index if not exists website_visits_visited_at_idx
+on public.website_visits (visited_at desc);
+
+create index if not exists website_visits_path_idx
+on public.website_visits (path);
+
 alter table public.admin_profiles enable row level security;
 alter table public.site_settings enable row level security;
 alter table public.chatbot_knowledge_chunks enable row level security;
@@ -90,6 +114,7 @@ alter table public.gallery_photos enable row level security;
 alter table public.reservations enable row level security;
 alter table public.waiver_submissions enable row level security;
 alter table public.contact_messages enable row level security;
+alter table public.website_visits enable row level security;
 
 create or replace function public.is_admin()
 returns boolean
@@ -221,6 +246,12 @@ with check (true);
 drop policy if exists "Admins read contact messages" on public.contact_messages;
 create policy "Admins read contact messages"
 on public.contact_messages for select
+to authenticated
+using (public.is_admin());
+
+drop policy if exists "Admins read website visits" on public.website_visits;
+create policy "Admins read website visits"
+on public.website_visits for select
 to authenticated
 using (public.is_admin());
 

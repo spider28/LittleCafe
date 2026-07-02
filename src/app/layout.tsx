@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Chatbot } from "@/components/Chatbot";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { VisitTracker } from "@/components/VisitTracker";
 import { cafe } from "@/lib/content";
 import { getChatbotSettings } from "@/lib/data";
 import "./globals.css";
@@ -20,6 +21,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang="en">
       <body className="min-h-screen font-sans antialiased">
+        <VisitTracker />
         <Header />
         <main>{children}</main>
         <Footer />

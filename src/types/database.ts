@@ -159,6 +159,44 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["contact_messages"]["Insert"]>;
         Relationships: [];
       };
+      website_visits: {
+        Row: {
+          id: string;
+          visited_at: string;
+          path: string;
+          search: string | null;
+          referrer: string | null;
+          host: string | null;
+          ip_address: string | null;
+          country: string | null;
+          region: string | null;
+          city: string | null;
+          user_agent: string | null;
+          browser: string | null;
+          os: string | null;
+          device_type: string | null;
+          is_bot: boolean;
+        };
+        Insert: {
+          id?: string;
+          visited_at?: string;
+          path: string;
+          search?: string | null;
+          referrer?: string | null;
+          host?: string | null;
+          ip_address?: string | null;
+          country?: string | null;
+          region?: string | null;
+          city?: string | null;
+          user_agent?: string | null;
+          browser?: string | null;
+          os?: string | null;
+          device_type?: string | null;
+          is_bot?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["website_visits"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: {};
     Functions: {

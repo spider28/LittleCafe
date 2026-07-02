@@ -1,5 +1,6 @@
 import { Field } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
+import Link from "next/link";
 import {
   createChatbotKnowledgeAction,
   createReservationAction,
@@ -51,9 +52,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <p className="text-sm font-semibold uppercase tracking-wide text-berry">Admin</p>
           <h1 className="text-4xl font-bold text-ink">LittleCafe dashboard</h1>
         </div>
-        <form action={signOutAction}>
-          <SubmitButton>Sign out</SubmitButton>
-        </form>
+        <div className="flex items-center gap-3">
+          <Link href="/admin/visits" className="rounded-md border border-black/15 px-4 py-2 text-sm font-semibold text-ink">
+            Website visits
+          </Link>
+          <form action={signOutAction}>
+            <SubmitButton>Sign out</SubmitButton>
+          </form>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
