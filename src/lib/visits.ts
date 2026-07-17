@@ -29,8 +29,14 @@ export type WebsiteVisitSummary = {
 const ignoredPathPrefixes = ["/admin", "/api", "/_next"];
 const ignoredExtensions = /\.(?:css|js|map|ico|png|jpg|jpeg|gif|webp|svg|txt|xml|json|woff2?)$/i;
 
+type VisitPayload = {
+  path?: string | null;
+  search?: string | null;
+  referrer?: string | null;
+};
+
 export function shouldTrackPath(path: string) {
-  return Boolean(path && !ignoredPathPrefixes.some((prefix) => path.startsWith(prefix)) && !ignoredExtensions.test(path));
+  return Boolean(path.startsWith("/") && !ignoredPathPrefixes.some((prefix) => path.startsWith(prefix)) && !ignoredExtensions.test(path));
 }
 
 function firstForwardedValue(value: string | null) {
@@ -83,15 +89,20 @@ function parseUserAgent(userAgent: string | null) {
 }
 
 export async function recordWebsiteVisit(headers: Headers) {
-  const path = headers.get("x-littlecafe-pathname") ?? "/";
+  return recordWebsiteVisitFromRequest(headers, {
+    path: headers.get("x-littlecafe-pathname") ?? "/",
+    search: headers.get("x-littlecafe-search") || null,
+    referrer: headers.get("referer") || null
+  });
+}
+
+export async function recordWebsiteVisitFromRequest(headers: Headers, payload: VisitPayload = {}) {
+  const path = payload.path ?? headers.get("x-littlecafe-pathname") ?? "/";
   if (!shouldTrackPath(path)) {
-    return;
+    return { recorded: false, reason: "ignored-path" };
   }
 
-  const supabase = createSupabaseAdminClient();
-  if (!supabase) {
-    return;
-  }
+  const supabase = createSupabaseAdminClient() ?? (await createSupabaseServerClient());
 
   const userAgent = headers.get("user-agent");
   const { browser, os, deviceType, isBot } = parseUserAgent(userAgent);
@@ -101,8 +112,8 @@ export async function recordWebsiteVisit(headers: Headers) {
 
   const { error } = await supabase.from("website_visits").insert({
     path,
-    search: headers.get("x-littlecafe-search") || null,
-    referrer: headers.get("referer") || null,
+    search: payload.search || null,
+    referrer: payload.referrer || headers.get("referer") || null,
     host: headers.get("host") || null,
     ip_address: ipAddress,
     country: headers.get("x-vercel-ip-country") || headers.get("cf-ipcountry") || null,
@@ -117,7 +128,10 @@ export async function recordWebsiteVisit(headers: Headers) {
 
   if (error) {
     console.error("[visits] failed to record visit", error.message);
+    return { recorded: false, reason: error.message };
   }
+
+  return { recorded: true };
 }
 
 export async function getWebsiteVisits(): Promise<{ visits: WebsiteVisit[]; summary: WebsiteVisitSummary }> {

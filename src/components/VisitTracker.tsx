@@ -1,7 +1,31 @@
-import { headers } from "next/headers";
-import { recordWebsiteVisit } from "@/lib/visits";
+"use client";
 
-export async function VisitTracker() {
-  await recordWebsiteVisit(await headers());
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+
+export function VisitTracker() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (!pathname) {
+      return;
+    }
+
+    const search = searchParams.toString();
+    void fetch("/api/visits", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path: pathname,
+        search: search ? `?${search}` : "",
+        referrer: document.referrer || null
+      }),
+      keepalive: true
+    }).catch(() => {
+      // Analytics should never interrupt a visitor's page.
+    });
+  }, [pathname, searchParams]);
+
   return null;
 }

@@ -255,6 +255,12 @@ on public.website_visits for select
 to authenticated
 using (public.is_admin());
 
+drop policy if exists "Anyone can record website visits" on public.website_visits;
+create policy "Anyone can record website visits"
+on public.website_visits for insert
+to anon, authenticated
+with check (true);
+
 insert into storage.buckets (id, name, public)
 values ('gallery', 'gallery', true)
 on conflict (id) do nothing;
