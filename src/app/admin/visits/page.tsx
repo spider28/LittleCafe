@@ -27,7 +27,7 @@ export default async function AdminVisitsPage() {
     );
   }
 
-  const { visits, summary } = await getWebsiteVisits();
+  const { visits, summary, warning } = await getWebsiteVisits();
 
   return (
     <section className="mx-auto grid max-w-7xl gap-6 px-4 py-10 sm:px-6 lg:px-8">
@@ -46,6 +46,13 @@ export default async function AdminVisitsPage() {
           </form>
         </div>
       </div>
+
+      {warning ? (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="alert">
+          <p className="font-semibold">Visit data needs attention</p>
+          <p className="mt-1">{warning}</p>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         <Metric label="Recent visits" value={summary.total} />

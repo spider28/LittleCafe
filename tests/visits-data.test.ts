@@ -51,6 +51,7 @@ describe("website visit data", () => {
     expect(supabaseMocks.createSupabaseServerClient).not.toHaveBeenCalled();
     expect(from).toHaveBeenCalledWith("website_visits");
     expect(result.visits).toEqual(rows);
+    expect(result.warning).toBeNull();
     expect(result.summary).toEqual({
       total: 2,
       uniqueIps: 1,
@@ -62,8 +63,18 @@ describe("website visit data", () => {
     });
   });
 
-  it("fails clearly when the service-role key is not configured", async () => {
-    await expect(getWebsiteVisits()).rejects.toThrow("SUPABASE_SERVICE_ROLE_KEY is required");
+  it("falls back to the authenticated client when the service-role key is not configured", async () => {
+    const limit = vi.fn().mockResolvedValue({ data: [], error: null });
+    const order = vi.fn(() => ({ limit }));
+    const select = vi.fn(() => ({ order }));
+    const from = vi.fn(() => ({ select }));
+    supabaseMocks.createSupabaseServerClient.mockResolvedValue({ from });
+
+    const result = await getWebsiteVisits();
+
+    expect(supabaseMocks.createSupabaseServerClient).toHaveBeenCalledOnce();
+    expect(result.visits).toEqual([]);
+    expect(result.warning).toContain("SUPABASE_SERVICE_ROLE_KEY");
   });
 
   it("does not turn database errors into an empty dashboard", async () => {
@@ -72,6 +83,9 @@ describe("website visit data", () => {
     const select = vi.fn(() => ({ order }));
     supabaseMocks.createSupabaseAdminClient.mockReturnValue({ from: vi.fn(() => ({ select })) });
 
-    await expect(getWebsiteVisits()).rejects.toThrow("failed to load visits: database unavailable");
+    const result = await getWebsiteVisits();
+
+    expect(result.visits).toEqual([]);
+    expect(result.warning).toContain("could not be loaded");
   });
 });

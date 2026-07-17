@@ -26,6 +26,12 @@ export type WebsiteVisitSummary = {
   topPaths: Array<{ path: string; count: number }>;
 };
 
+export type WebsiteVisitsResult = {
+  visits: WebsiteVisit[];
+  summary: WebsiteVisitSummary;
+  warning: string | null;
+};
+
 const ignoredPathPrefixes = ["/admin", "/api", "/_next"];
 const ignoredExtensions = /\.(?:css|js|map|ico|png|jpg|jpeg|gif|webp|svg|txt|xml|json|woff2?)$/i;
 
@@ -134,23 +140,34 @@ export async function recordWebsiteVisitFromRequest(headers: Headers, payload: V
   return { recorded: true };
 }
 
-export async function getWebsiteVisits(): Promise<{ visits: WebsiteVisit[]; summary: WebsiteVisitSummary }> {
+export async function getWebsiteVisits(): Promise<WebsiteVisitsResult> {
   noStore();
-  // requireAdmin() protects the only caller of this function. Use the server-only
-  // client here so an administrator accepted through ADMIN_EMAIL is not silently
-  // filtered out by the database policy, which only checks admin_profiles.
-  const supabase = createSupabaseAdminClient();
-  if (!supabase) {
-    throw new Error("[visits] SUPABASE_SERVICE_ROLE_KEY is required to load website visits");
-  }
+  // Prefer the server-only client after requireAdmin() has authorized the page,
+  // but keep the authenticated/RLS path working when that optional key is absent.
+  const adminClient = createSupabaseAdminClient();
+  const supabase = adminClient ?? (await createSupabaseServerClient());
 
   const { data, error } = await supabase.from("website_visits").select("*").order("visited_at", { ascending: false }).limit(100);
 
   if (error) {
-    throw new Error(`[visits] failed to load visits: ${error.message}`);
+    console.error("[visits] failed to load visits", error.message);
+    return {
+      visits: [],
+      summary: summarizeWebsiteVisits([]),
+      warning: "Website visit data could not be loaded. Check the server logs and Supabase access configuration."
+    };
   }
 
   const visits = (data ?? []) as WebsiteVisit[];
+  const warning =
+    !adminClient && !visits.length
+      ? "Supabase returned no visit rows through the authenticated session. Configure SUPABASE_SERVICE_ROLE_KEY in Vercel or apply the website_visits admin SELECT policy from supabase/schema.sql."
+      : null;
+
+  return { visits, summary: summarizeWebsiteVisits(visits), warning };
+}
+
+function summarizeWebsiteVisits(visits: WebsiteVisit[]): WebsiteVisitSummary {
   const uniqueIps = new Set(visits.map((visit) => visit.ip_address).filter(Boolean)).size;
   const pathCounts = new Map<string, number>();
 
@@ -159,15 +176,12 @@ export async function getWebsiteVisits(): Promise<{ visits: WebsiteVisit[]; summ
   }
 
   return {
-    visits,
-    summary: {
-      total: visits.length,
-      uniqueIps,
-      bots: visits.filter((visit) => visit.is_bot).length,
-      topPaths: [...pathCounts.entries()]
-        .map(([path, count]) => ({ path, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5)
-    }
+    total: visits.length,
+    uniqueIps,
+    bots: visits.filter((visit) => visit.is_bot).length,
+    topPaths: [...pathCounts.entries()]
+      .map(([path, count]) => ({ path, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
   };
 }
