@@ -136,8 +136,20 @@ export async function recordWebsiteVisitFromRequest(headers: Headers, payload: V
 
 export async function getWebsiteVisits(): Promise<{ visits: WebsiteVisit[]; summary: WebsiteVisitSummary }> {
   noStore();
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.from("website_visits").select("*").order("visited_at", { ascending: false }).limit(100);
+  // requireAdmin() protects the only caller of this function. Use the server-only
+  // client here so an administrator accepted through ADMIN_EMAIL is not silently
+  // filtered out by the database policy, which only checks admin_profiles.
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) {
+    throw new Error("[visits] SUPABASE_SERVICE_ROLE_KEY is required to load website visits");
+  }
+
+  const { data, error } = await supabase.from("website_visits").select("*").order("visited_at", { ascending: false }).limit(100);
+
+  if (error) {
+    throw new Error(`[visits] failed to load visits: ${error.message}`);
+  }
+
   const visits = (data ?? []) as WebsiteVisit[];
   const uniqueIps = new Set(visits.map((visit) => visit.ip_address).filter(Boolean)).size;
   const pathCounts = new Map<string, number>();
