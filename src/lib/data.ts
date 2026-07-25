@@ -75,9 +75,10 @@ export async function getWeeklyReservations() {
 export async function getAdminOverview() {
   noStore();
   const supabase = await createSupabaseServerClient();
-  const [settings, knowledge, gallery, reservations, waivers, contacts] = await Promise.all([
+  const [settings, knowledge, knowledgeGaps, gallery, reservations, waivers, contacts] = await Promise.all([
     getChatbotSettings(),
     supabase.from("chatbot_knowledge_chunks").select("id", { count: "exact", head: true }),
+    supabase.from("chatbot_knowledge_gaps").select("id", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("gallery_photos").select("id", { count: "exact", head: true }),
     supabase.from("reservations").select("id", { count: "exact", head: true }),
     supabase.from("waiver_submissions").select("id", { count: "exact", head: true }),
@@ -88,6 +89,7 @@ export async function getAdminOverview() {
     settings,
     counts: {
       knowledge: knowledge.count ?? 0,
+      knowledgeGaps: knowledgeGaps.count ?? 0,
       gallery: gallery.count ?? 0,
       reservations: reservations.count ?? 0,
       waivers: waivers.count ?? 0,
@@ -99,18 +101,26 @@ export async function getAdminOverview() {
 export async function getAdminChatbotData() {
   noStore();
   const supabase = await createSupabaseServerClient();
-  const [settings, knowledge] = await Promise.all([
+  const [settings, knowledge, knowledgeGaps] = await Promise.all([
     getChatbotSettings(),
     supabase
       .from("chatbot_knowledge_chunks")
       .select("id,title,source,content,active,created_at")
       .order("created_at", { ascending: false })
+      .limit(50),
+    supabase
+      .from("chatbot_knowledge_gaps")
+      .select("id,question,suggested_answer,status,occurrence_count,created_at,last_asked_at")
+      .eq("status", "pending")
+      .order("last_asked_at", { ascending: false })
       .limit(50)
   ]);
 
   return {
     settings,
-    knowledge: knowledge.data ?? []
+    knowledge: knowledge.data ?? [],
+    knowledgeGaps: knowledgeGaps.data ?? [],
+    knowledgeGapsAvailable: !knowledgeGaps.error
   };
 }
 

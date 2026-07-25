@@ -61,6 +61,34 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["chatbot_threads"]["Insert"]>;
         Relationships: [];
       };
+      chatbot_knowledge_gaps: {
+        Row: {
+          id: string;
+          normalized_question: string;
+          question: string;
+          suggested_answer: string | null;
+          status: "pending" | "approved" | "dismissed";
+          occurrence_count: number;
+          knowledge_chunk_id: string | null;
+          created_at: string;
+          last_asked_at: string;
+          reviewed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          normalized_question: string;
+          question: string;
+          suggested_answer?: string | null;
+          status?: "pending" | "approved" | "dismissed";
+          occurrence_count?: number;
+          knowledge_chunk_id?: string | null;
+          created_at?: string;
+          last_asked_at?: string;
+          reviewed_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["chatbot_knowledge_gaps"]["Insert"]>;
+        Relationships: [];
+      };
       admin_profiles: {
         Row: { id: string; user_id: string; email: string; created_at: string };
         Insert: { id?: string; user_id: string; email: string; created_at?: string };
@@ -213,6 +241,13 @@ export type Database = {
           source: string;
           similarity: number;
         }>;
+      };
+      capture_chatbot_knowledge_gap: {
+        Args: {
+          question_input: string;
+          suggested_answer_input?: string | null;
+        };
+        Returns: string | null;
       };
     };
     Enums: {};

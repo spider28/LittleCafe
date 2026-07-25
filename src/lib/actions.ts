@@ -320,3 +320,86 @@ export async function deleteChatbotKnowledgeAction(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/admin/chatbot");
 }
+
+export async function approveChatbotKnowledgeGapAction(_state: ActionState, formData: FormData): Promise<ActionState> {
+  const { allowed } = await requireAdmin();
+  if (!allowed) redirect("/admin");
+
+  const gapId = formValue(formData, "gapId");
+  const parsed = chatbotKnowledgeSchema.safeParse({
+    title: formValue(formData, "title"),
+    source: formValue(formData, "source"),
+    content: formValue(formData, "content"),
+    active: true
+  });
+
+  if (!gapId || !parsed.success) {
+    return { ok: false, message: parsed.success ? "The review item is missing." : (parsed.error.issues[0]?.message ?? "Please check the knowledge details.") };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const pendingGap = await supabase.from("chatbot_knowledge_gaps").select("id").eq("id", gapId).eq("status", "pending").maybeSingle();
+  if (pendingGap.error || !pendingGap.data) {
+    return { ok: false, message: "This question is no longer waiting for review." };
+  }
+
+  let embedding: number[];
+  try {
+    const settings = await getChatbotSettings();
+    embedding = await createEmbedding(`${parsed.data.title}\n\n${parsed.data.content}`, settings.provider);
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Embedding generation failed." };
+  }
+
+  const insert = await supabase
+    .from("chatbot_knowledge_chunks")
+    .insert({
+      title: parsed.data.title,
+      source: parsed.data.source || "reviewed question",
+      content: parsed.data.content,
+      active: true,
+      embedding
+    })
+    .select("id")
+    .single();
+
+  if (insert.error || !insert.data) {
+    return { ok: false, message: "Approved knowledge could not be saved. Make sure the latest Supabase schema has been applied." };
+  }
+
+  const review = await supabase
+    .from("chatbot_knowledge_gaps")
+    .update({
+      status: "approved",
+      knowledge_chunk_id: insert.data.id,
+      reviewed_at: new Date().toISOString()
+    })
+    .eq("id", gapId)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
+
+  if (review.error || !review.data) {
+    await supabase.from("chatbot_knowledge_chunks").delete().eq("id", insert.data.id);
+    return { ok: false, message: "The review item could not be approved." };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/chatbot");
+  return { ok: true, message: "Question approved and added to chatbot retrieval." };
+}
+
+export async function dismissChatbotKnowledgeGapAction(formData: FormData) {
+  const { allowed } = await requireAdmin();
+  if (!allowed) redirect("/admin");
+
+  const supabase = await createSupabaseServerClient();
+  await supabase
+    .from("chatbot_knowledge_gaps")
+    .update({ status: "dismissed", reviewed_at: new Date().toISOString() })
+    .eq("id", formValue(formData, "gapId"))
+    .eq("status", "pending");
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/chatbot");
+}

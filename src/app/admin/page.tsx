@@ -11,8 +11,8 @@ export default async function AdminPage() {
     {
       href: "/admin/chatbot",
       label: "Chatbot",
-      description: "Configure the provider and manage approved knowledge.",
-      metric: `${counts.knowledge} knowledge items`,
+      description: "Configure the provider, review knowledge gaps, and manage approved knowledge.",
+      metric: `${counts.knowledge} approved · ${counts.knowledgeGaps} to review`,
       icon: BotMessageSquare
     },
     {

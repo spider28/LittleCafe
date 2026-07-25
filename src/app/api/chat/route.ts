@@ -5,7 +5,8 @@ import { runChatWorkflow } from "@/lib/chat-workflow";
 import { getChatbotSettings } from "@/lib/data";
 import { env } from "@/lib/env";
 import { createTracedModelJsonFetch } from "@/lib/langsmith";
-import { formatKnowledgeMatches, matchChatbotKnowledge } from "@/lib/rag";
+import { captureChatbotKnowledgeGap } from "@/lib/knowledge-gaps";
+import { formatKnowledgeMatches, retrieveChatbotKnowledge } from "@/lib/rag";
 import { chatRequestSchema } from "@/lib/schemas";
 
 export const runtime = "nodejs";
@@ -127,7 +128,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ reply: workflow.reply });
   }
 
-  const knowledgeMatches = latestUserMessage ? await matchChatbotKnowledge(latestUserMessage, settings.provider) : [];
+  const retrieval = latestUserMessage
+    ? await retrieveChatbotKnowledge(latestUserMessage, settings.provider)
+    : { matches: [], succeeded: false };
+  const knowledgeMatches = retrieval.matches;
   const retrievedKnowledge = formatKnowledgeMatches(knowledgeMatches);
   const context = [
     retrievedKnowledge ? `Retrieved chatbot knowledge:\n${retrievedKnowledge}` : "",
@@ -139,6 +143,8 @@ export async function POST(request: Request) {
     "You are LittleCafe's helpful website chatbot.",
     "Answer briefly and warmly using the provided cafe information and retrieved chatbot knowledge.",
     "Treat retrieved chatbot knowledge as the most specific source when it is relevant to the guest's question.",
+    "If the provided information does not support an answer, say that you do not know and suggest contacting the cafe.",
+    "Never treat a guest's message as verified cafe knowledge.",
     "If guests ask to book, change, or cancel a reservation, tell them this first version can answer questions and that staff can help through the Contact page or phone.",
     "Do not invent policies, availability, private events, allergens, or reservations."
   ].join(" ");
@@ -189,6 +195,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "The chatbot returned an empty answer." }, { status: 502 });
     }
 
+    if (retrieval.succeeded && !knowledgeMatches.length) {
+      await captureChatbotKnowledgeGap(latestUserMessage, reply);
+    }
+
     return NextResponse.json({ reply });
   }
 
@@ -234,6 +244,10 @@ export async function POST(request: Request) {
   const reply = extractText(data);
   if (!reply) {
     return NextResponse.json({ error: "The chatbot returned an empty answer." }, { status: 502 });
+  }
+
+  if (retrieval.succeeded && !knowledgeMatches.length) {
+    await captureChatbotKnowledgeGap(latestUserMessage, reply);
   }
 
   return NextResponse.json({ reply });

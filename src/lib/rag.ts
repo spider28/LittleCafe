@@ -23,6 +23,11 @@ type EmbeddingResponse = {
 const matchThreshold = 0.72;
 const matchCount = 5;
 
+export type ChatbotKnowledgeRetrieval = {
+  matches: ChatbotKnowledgeMatch[];
+  succeeded: boolean;
+};
+
 export async function createEmbedding(input: string, provider: ChatbotProvider) {
   const isGitHub = provider === "github";
   const apiKey = isGitHub ? env.githubToken : env.openaiApiKey;
@@ -78,9 +83,9 @@ export async function createEmbedding(input: string, provider: ChatbotProvider) 
   return embedding;
 }
 
-export async function matchChatbotKnowledge(query: string, provider: ChatbotProvider): Promise<ChatbotKnowledgeMatch[]> {
+export async function retrieveChatbotKnowledge(query: string, provider: ChatbotProvider): Promise<ChatbotKnowledgeRetrieval> {
   if (provider === "github" ? !env.githubToken : !env.openaiApiKey) {
-    return [];
+    return { matches: [], succeeded: false };
   }
 
   try {
@@ -94,14 +99,18 @@ export async function matchChatbotKnowledge(query: string, provider: ChatbotProv
 
     if (error) {
       console.error("[chat:rag] semantic search failed", error.message);
-      return [];
+      return { matches: [], succeeded: false };
     }
 
-    return (data ?? []) as ChatbotKnowledgeMatch[];
+    return { matches: (data ?? []) as ChatbotKnowledgeMatch[], succeeded: true };
   } catch (error) {
     console.error("[chat:rag] retrieval skipped", error instanceof Error ? error.message : error);
-    return [];
+    return { matches: [], succeeded: false };
   }
+}
+
+export async function matchChatbotKnowledge(query: string, provider: ChatbotProvider): Promise<ChatbotKnowledgeMatch[]> {
+  return (await retrieveChatbotKnowledge(query, provider)).matches;
 }
 
 export function formatKnowledgeMatches(matches: ChatbotKnowledgeMatch[]) {

@@ -28,9 +28,25 @@ create table if not exists public.chatbot_threads (
   expires_at timestamptz
 );
 
+create table if not exists public.chatbot_knowledge_gaps (
+  id uuid primary key default gen_random_uuid(),
+  normalized_question text not null unique,
+  question text not null,
+  suggested_answer text,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'dismissed')),
+  occurrence_count integer not null default 1 check (occurrence_count > 0),
+  knowledge_chunk_id uuid references public.chatbot_knowledge_chunks(id) on delete set null,
+  created_at timestamptz not null default now(),
+  last_asked_at timestamptz not null default now(),
+  reviewed_at timestamptz
+);
+
 create index if not exists chatbot_knowledge_chunks_embedding_idx
 on public.chatbot_knowledge_chunks
 using hnsw (embedding extensions.vector_cosine_ops);
+
+create index if not exists chatbot_knowledge_gaps_review_idx
+on public.chatbot_knowledge_gaps (status, last_asked_at desc);
 
 create table if not exists public.admin_profiles (
   id uuid primary key default gen_random_uuid(),
@@ -110,6 +126,7 @@ alter table public.admin_profiles enable row level security;
 alter table public.site_settings enable row level security;
 alter table public.chatbot_knowledge_chunks enable row level security;
 alter table public.chatbot_threads enable row level security;
+alter table public.chatbot_knowledge_gaps enable row level security;
 alter table public.gallery_photos enable row level security;
 alter table public.reservations enable row level security;
 alter table public.waiver_submissions enable row level security;
@@ -160,6 +177,13 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+drop policy if exists "Admins manage chatbot knowledge gaps" on public.chatbot_knowledge_gaps;
+create policy "Admins manage chatbot knowledge gaps"
+on public.chatbot_knowledge_gaps for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
 create or replace function public.match_chatbot_knowledge(
   query_embedding extensions.vector(1536),
   match_threshold double precision default 0.72,
@@ -192,6 +216,55 @@ as $$
 $$;
 
 grant execute on function public.match_chatbot_knowledge(extensions.vector, double precision, integer) to anon, authenticated;
+
+create or replace function public.capture_chatbot_knowledge_gap(
+  question_input text,
+  suggested_answer_input text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  cleaned_question text := left(regexp_replace(trim(coalesce(question_input, '')), '\s+', ' ', 'g'), 1200);
+  normalized text;
+  gap_id uuid;
+begin
+  if char_length(cleaned_question) < 6 then
+    return null;
+  end if;
+
+  normalized := lower(cleaned_question);
+
+  insert into public.chatbot_knowledge_gaps (
+    normalized_question,
+    question,
+    suggested_answer
+  )
+  values (
+    normalized,
+    cleaned_question,
+    left(nullif(trim(suggested_answer_input), ''), 4000)
+  )
+  on conflict (normalized_question) do update
+  set
+    question = excluded.question,
+    suggested_answer = case
+      when chatbot_knowledge_gaps.status = 'pending' and excluded.suggested_answer is not null
+        then excluded.suggested_answer
+      else chatbot_knowledge_gaps.suggested_answer
+    end,
+    occurrence_count = chatbot_knowledge_gaps.occurrence_count + 1,
+    last_asked_at = now()
+  returning id into gap_id;
+
+  return gap_id;
+end;
+$$;
+
+revoke all on function public.capture_chatbot_knowledge_gap(text, text) from public;
+grant execute on function public.capture_chatbot_knowledge_gap(text, text) to service_role;
 
 drop policy if exists "Admins can read admin profiles" on public.admin_profiles;
 create policy "Admins can read admin profiles"

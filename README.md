@@ -13,6 +13,7 @@ Responsive cafe website built with Next.js, TypeScript, Supabase, Resend, and Ve
 - Server-side visit tracking with an Admin-only visits page.
 - Site-wide V1 chatbot powered by the OpenAI Responses API.
 - RAG chatbot knowledge with Supabase `pgvector`.
+- Admin-reviewed knowledge-gap capture for questions that retrieval cannot answer.
 - LangGraph-powered party planning workflow with persisted chatbot thread state.
 
 ## Getting Started
@@ -59,7 +60,7 @@ Set `LANGSMITH_TRACING=true` with a `LANGSMITH_API_KEY` to trace chatbot workflo
 ## Supabase Setup
 
 1. Create a Supabase project.
-2. Run `supabase/schema.sql` in the Supabase SQL editor.
+2. Run `supabase/schema.sql` in the Supabase SQL editor. Run it again after pulling schema changes; the script is idempotent.
 3. Create an Auth user for the administrator.
 4. Insert the administrator into `admin_profiles`:
 
@@ -75,6 +76,8 @@ The schema creates the `gallery` storage bucket, public gallery reads, public in
 ## Chatbot RAG
 
 V2 chatbot RAG uses Supabase Postgres with `pgvector`. Add chatbot knowledge in Admin; each entry is embedded with the embedding model for the selected Admin chatbot provider and stored as `vector(1536)`. On each chat message, `/api/chat` embeds the latest user question, calls the `match_chatbot_knowledge` RPC, and sends the most relevant chunks to the selected chat provider.
+
+When retrieval succeeds but finds no relevant approved chunk, question-like visitor input is deduplicated into the Admin **Questions to review** queue. The model reply is shown only as an untrusted draft. An administrator must verify or rewrite it before approval creates an embedding and moves it into the active knowledge library. Visitor messages are never added directly to retrieval.
 
 ## LangGraph Chatbot Workflow
 
