@@ -144,8 +144,8 @@ export async function POST(request: Request) {
   ].join(" ");
 
   if (settings.provider === "github") {
-    if (!env.githubApiKey) {
-      return NextResponse.json({ error: "GitHub Models is not configured yet. Add GITHUB_API_KEY to .env.local." }, { status: 503 });
+    if (!env.githubToken) {
+      return NextResponse.json({ error: "GitHub Models is not configured yet. Add GITHUB_TOKEN to .env.local." }, { status: 503 });
     }
 
     const fetchGithubChat = createTracedModelJsonFetch<ChatCompletionResponse>({
@@ -156,7 +156,7 @@ export async function POST(request: Request) {
     const response = await fetchGithubChat(env.githubEndPoint, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${env.githubApiKey}`,
+        Authorization: `Bearer ${env.githubToken}`,
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
         "Content-Type": "application/json"

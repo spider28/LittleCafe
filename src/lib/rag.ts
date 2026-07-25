@@ -25,13 +25,13 @@ const matchCount = 5;
 
 export async function createEmbedding(input: string, provider: ChatbotProvider) {
   const isGitHub = provider === "github";
-  const apiKey = isGitHub ? env.githubApiKey : env.openaiApiKey;
+  const apiKey = isGitHub ? env.githubToken : env.openaiApiKey;
   const endpoint = isGitHub ? env.githubEmbeddingEndPoint : env.openaiEmbeddingEndPoint;
   const model = isGitHub ? env.githubEmbeddingModel : env.openaiEmbeddingModel;
   const providerName = isGitHub ? "GitHub Models" : "OpenAI";
 
   if (!apiKey) {
-    throw new Error(`${providerName} embeddings are not configured yet. Add ${isGitHub ? "GITHUB_API_KEY" : "OPENAI_API_KEY"} to .env.local.`);
+    throw new Error(`${providerName} embeddings are not configured yet. Add ${isGitHub ? "GITHUB_TOKEN" : "OPENAI_API_KEY"} to .env.local.`);
   }
 
   const fetchEmbedding = createTracedModelJsonFetch<EmbeddingResponse>({
@@ -79,7 +79,7 @@ export async function createEmbedding(input: string, provider: ChatbotProvider) 
 }
 
 export async function matchChatbotKnowledge(query: string, provider: ChatbotProvider): Promise<ChatbotKnowledgeMatch[]> {
-  if (provider === "github" ? !env.githubApiKey : !env.openaiApiKey) {
+  if (provider === "github" ? !env.githubToken : !env.openaiApiKey) {
     return [];
   }
 

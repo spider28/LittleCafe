@@ -10,7 +10,7 @@ export const env = {
     openaiEndPoint: process.env.OPENAI_END_POINT ?? "https://api.openai.com/v1/responses",
     openaiEmbeddingModel: process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small",
     openaiEmbeddingEndPoint: process.env.OPENAI_EMBEDDING_END_POINT ?? "https://api.openai.com/v1/embeddings",
-    githubApiKey: process.env.GITHUB_API_KEY ?? process.env.GITHUB_TOKEN ?? "",
+    githubToken: process.env.GITHUB_TOKEN ?? "",
     githubModel: process.env.GITHUB_MODEL ?? "openai/gpt-4.1-mini",
     githubEndPoint: process.env.GITHUB_END_POINT ?? "https://models.github.ai/inference/chat/completions",
     githubEmbeddingModel: process.env.GITHUB_EMBEDDING_MODEL ?? "openai/text-embedding-3-small",
