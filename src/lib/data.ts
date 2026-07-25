@@ -72,16 +72,65 @@ export async function getWeeklyReservations() {
   return data ?? [];
 }
 
-export async function getAdminCollections(query?: { waiver?: string; date?: string }) {
+export async function getAdminOverview() {
+  noStore();
   const supabase = await createSupabaseServerClient();
-  const [settings, knowledge, gallery, reservations, contacts] = await Promise.all([
+  const [settings, knowledge, gallery, reservations, waivers, contacts] = await Promise.all([
     getChatbotSettings(),
-    supabase.from("chatbot_knowledge_chunks").select("id,title,source,content,active,created_at").order("created_at", { ascending: false }).limit(20),
-    supabase.from("gallery_photos").select("*").order("display_order"),
-    supabase.from("reservations").select("*").order("starts_at", { ascending: false }).limit(20),
-    supabase.from("contact_messages").select("*").order("created_at", { ascending: false }).limit(20)
+    supabase.from("chatbot_knowledge_chunks").select("id", { count: "exact", head: true }),
+    supabase.from("gallery_photos").select("id", { count: "exact", head: true }),
+    supabase.from("reservations").select("id", { count: "exact", head: true }),
+    supabase.from("waiver_submissions").select("id", { count: "exact", head: true }),
+    supabase.from("contact_messages").select("id", { count: "exact", head: true })
   ]);
 
+  return {
+    settings,
+    counts: {
+      knowledge: knowledge.count ?? 0,
+      gallery: gallery.count ?? 0,
+      reservations: reservations.count ?? 0,
+      waivers: waivers.count ?? 0,
+      contacts: contacts.count ?? 0
+    }
+  };
+}
+
+export async function getAdminChatbotData() {
+  noStore();
+  const supabase = await createSupabaseServerClient();
+  const [settings, knowledge] = await Promise.all([
+    getChatbotSettings(),
+    supabase
+      .from("chatbot_knowledge_chunks")
+      .select("id,title,source,content,active,created_at")
+      .order("created_at", { ascending: false })
+      .limit(50)
+  ]);
+
+  return {
+    settings,
+    knowledge: knowledge.data ?? []
+  };
+}
+
+export async function getAdminGalleryData() {
+  noStore();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.from("gallery_photos").select("*").order("display_order");
+  return data ?? [];
+}
+
+export async function getAdminReservationsData() {
+  noStore();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.from("reservations").select("*").order("starts_at", { ascending: false }).limit(50);
+  return data ?? [];
+}
+
+export async function getAdminWaivers(query?: { waiver?: string; date?: string }) {
+  noStore();
+  const supabase = await createSupabaseServerClient();
   let waiverQuery = supabase.from("waiver_submissions").select("*").order("created_at", { ascending: false }).limit(30);
   if (query?.waiver) {
     const pattern = `%${query.waiver}%`;
@@ -93,14 +142,13 @@ export async function getAdminCollections(query?: { waiver?: string; date?: stri
     end.setDate(end.getDate() + 1);
     waiverQuery = waiverQuery.gte("created_at", start.toISOString()).lt("created_at", end.toISOString());
   }
-  const waivers = await waiverQuery;
+  const { data } = await waiverQuery;
+  return data ?? [];
+}
 
-  return {
-    settings,
-    knowledge: knowledge.data ?? [],
-    gallery: gallery.data ?? [],
-    reservations: reservations.data ?? [],
-    contacts: contacts.data ?? [],
-    waivers: waivers.data ?? []
-  };
+export async function getAdminMessages() {
+  noStore();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.from("contact_messages").select("*").order("created_at", { ascending: false }).limit(50);
+  return data ?? [];
 }

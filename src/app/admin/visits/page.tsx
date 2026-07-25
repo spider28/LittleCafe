@@ -1,51 +1,14 @@
-import Link from "next/link";
-import { signInAction, signOutAction } from "@/lib/actions";
-import { requireAdmin } from "@/lib/admin";
+import { AdminSectionHeader } from "@/components/admin/AdminSectionHeader";
 import { getWebsiteVisits } from "@/lib/visits";
-import { ActionForm } from "@/components/ActionForm";
-import { Field } from "@/components/Field";
-import { SubmitButton } from "@/components/SubmitButton";
 
 export const metadata = { title: "Website visits" };
 
 export default async function AdminVisitsPage() {
-  const { user, allowed } = await requireAdmin();
-
-  if (!user) {
-    return <LoginView />;
-  }
-
-  if (!allowed) {
-    return (
-      <section className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-ink">Admin access required</h1>
-        <p className="mt-3 text-ink/70">You are signed in, but this account is not in the administrator allowlist.</p>
-        <form action={signOutAction} className="mt-6">
-          <SubmitButton>Sign out</SubmitButton>
-        </form>
-      </section>
-    );
-  }
-
   const { visits, summary, warning } = await getWebsiteVisits();
 
   return (
-    <section className="mx-auto grid max-w-7xl gap-6 px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-berry">Admin</p>
-          <h1 className="text-4xl font-bold text-ink">Website visits</h1>
-          <p className="mt-2 text-sm text-ink/65">Showing the latest 100 recorded public page visits.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href="/admin" className="rounded-md border border-black/15 px-4 py-2 text-sm font-semibold text-ink">
-            Dashboard
-          </Link>
-          <form action={signOutAction}>
-            <SubmitButton>Sign out</SubmitButton>
-          </form>
-        </div>
-      </div>
+    <div className="grid gap-6">
+      <AdminSectionHeader title="Website analytics" description="Review the latest 100 recorded public page visits." />
 
       {warning ? (
         <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="alert">
@@ -122,7 +85,7 @@ export default async function AdminVisitsPage() {
           </table>
         </div>
       </section>
-    </section>
+    </div>
   );
 }
 
@@ -132,20 +95,5 @@ function Metric({ label, value }: { label: string; value: number }) {
       <p className="text-sm font-semibold uppercase tracking-wide text-ink/55">{label}</p>
       <p className="mt-2 text-3xl font-bold text-ink">{value}</p>
     </div>
-  );
-}
-
-function LoginView() {
-  return (
-    <section className="mx-auto max-w-md px-4 py-16 sm:px-6 lg:px-8">
-      <h1 className="text-3xl font-bold text-ink">Administrator login</h1>
-      <p className="mt-3 text-ink/70">Sign in with a Supabase Auth account that is allowlisted for Admin access.</p>
-      <div className="mt-6 rounded-md border border-black/10 bg-white p-6">
-        <ActionForm action={signInAction} buttonLabel="Sign in">
-          <Field name="email" label="Email" type="email" required />
-          <Field name="password" label="Password" type="password" required />
-        </ActionForm>
-      </div>
-    </section>
   );
 }

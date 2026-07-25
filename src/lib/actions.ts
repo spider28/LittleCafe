@@ -90,6 +90,7 @@ export async function submitContactAction(_state: ActionState, formData: FormDat
 
   await supabase.from("contact_messages").update({ email_status: emailStatus }).eq("id", data.id);
   revalidatePath("/admin");
+  revalidatePath("/admin/messages");
   return { ok: true, message: "Thanks. Your message has been sent to the cafe team." };
 }
 
@@ -120,6 +121,7 @@ export async function submitWaiverAction(_state: ActionState, formData: FormData
   }
 
   revalidatePath("/admin");
+  revalidatePath("/admin/waivers");
   return { ok: true, message: "Waiver submitted. Thank you." };
 }
 
@@ -154,6 +156,7 @@ export async function createReservationAction(formData: FormData) {
 
   revalidatePath("/calendar");
   revalidatePath("/admin");
+  revalidatePath("/admin/reservations");
 }
 
 export async function deleteReservationAction(formData: FormData) {
@@ -163,6 +166,7 @@ export async function deleteReservationAction(formData: FormData) {
   await supabase.from("reservations").delete().eq("id", formValue(formData, "id"));
   revalidatePath("/calendar");
   revalidatePath("/admin");
+  revalidatePath("/admin/reservations");
 }
 
 export async function uploadGalleryPhotoAction(_state: ActionState, formData: FormData): Promise<ActionState> {
@@ -218,6 +222,7 @@ export async function uploadGalleryPhotoAction(_state: ActionState, formData: Fo
 
   revalidatePath("/gallery");
   revalidatePath("/admin");
+  revalidatePath("/admin/gallery");
   return { ok: true, message: "Photo uploaded to the gallery." };
 }
 
@@ -235,6 +240,7 @@ export async function deleteGalleryPhotoAction(formData: FormData) {
   await supabase.from("gallery_photos").delete().eq("id", id);
   revalidatePath("/gallery");
   revalidatePath("/admin");
+  revalidatePath("/admin/gallery");
 }
 
 export async function updateChatbotSettingsAction(_state: ActionState, formData: FormData): Promise<ActionState> {
@@ -260,6 +266,7 @@ export async function updateChatbotSettingsAction(_state: ActionState, formData:
 
   revalidatePath("/");
   revalidatePath("/admin");
+  revalidatePath("/admin/chatbot");
   return { ok: true, message: "Chatbot settings saved." };
 }
 
@@ -300,6 +307,7 @@ export async function createChatbotKnowledgeAction(_state: ActionState, formData
   }
 
   revalidatePath("/admin");
+  revalidatePath("/admin/chatbot");
   return { ok: true, message: "Knowledge added to chatbot retrieval." };
 }
 
@@ -310,4 +318,5 @@ export async function deleteChatbotKnowledgeAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   await supabase.from("chatbot_knowledge_chunks").delete().eq("id", formValue(formData, "id"));
   revalidatePath("/admin");
+  revalidatePath("/admin/chatbot");
 }

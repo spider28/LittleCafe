@@ -30,8 +30,18 @@ test("mobile menu navigates to pricing", async ({ page, baseURL, isMobile }) => 
 });
 
 test("admin page shows login guard", async ({ page }) => {
-  await page.goto("/admin");
-  await expect(page.getByRole("heading", { name: "Administrator login" })).toBeVisible();
+  for (const path of [
+    "/admin",
+    "/admin/chatbot",
+    "/admin/reservations",
+    "/admin/gallery",
+    "/admin/waivers",
+    "/admin/messages",
+    "/admin/visits"
+  ]) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { name: "Administrator login" })).toBeVisible();
+  }
 });
 
 test("waiver and contact forms render", async ({ page, baseURL }) => {

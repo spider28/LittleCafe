@@ -62,6 +62,27 @@ function cleanIpAddress(ip: string | null) {
   return normalized;
 }
 
+export function isLocalVisitHost(host: string | null) {
+  const normalized = host?.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  if (normalized === "::1") {
+    return true;
+  }
+
+  const hostname = normalized.startsWith("[")
+    ? normalized.slice(1, normalized.indexOf("]"))
+    : normalized.split(":")[0];
+
+  return hostname === "localhost" || hostname.endsWith(".localhost") || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+export function isLocalWebsiteVisit(visit: Pick<WebsiteVisit, "host" | "ip_address">) {
+  return isLocalVisitHost(visit.host) || cleanIpAddress(visit.ip_address) === "127.0.0.1";
+}
+
 function parseUserAgent(userAgent: string | null) {
   const ua = userAgent ?? "";
   const isBot = /\b(bot|crawler|spider|crawling|preview|slurp|bing|googlebot|duckduckbot|baiduspider|yandex)\b/i.test(ua);
@@ -108,19 +129,24 @@ export async function recordWebsiteVisitFromRequest(headers: Headers, payload: V
     return { recorded: false, reason: "ignored-path" };
   }
 
-  const supabase = createSupabaseAdminClient() ?? (await createSupabaseServerClient());
-
   const userAgent = headers.get("user-agent");
   const { browser, os, deviceType, isBot } = parseUserAgent(userAgent);
   const ipAddress = cleanIpAddress(
     firstForwardedValue(headers.get("x-forwarded-for")) ?? headers.get("x-real-ip") ?? headers.get("cf-connecting-ip") ?? headers.get("x-vercel-forwarded-for")
   );
+  const host = headers.get("host");
+
+  if (isLocalVisitHost(host) || ipAddress === "127.0.0.1") {
+    return { recorded: false, reason: "ignored-local-visit" };
+  }
+
+  const supabase = createSupabaseAdminClient() ?? (await createSupabaseServerClient());
 
   const { error } = await supabase.from("website_visits").insert({
     path,
     search: payload.search || null,
     referrer: payload.referrer || headers.get("referer") || null,
-    host: headers.get("host") || null,
+    host: host || null,
     ip_address: ipAddress,
     country: headers.get("x-vercel-ip-country") || headers.get("cf-ipcountry") || null,
     region: headers.get("x-vercel-ip-country-region") || null,
@@ -147,7 +173,7 @@ export async function getWebsiteVisits(): Promise<WebsiteVisitsResult> {
   const adminClient = createSupabaseAdminClient();
   const supabase = adminClient ?? (await createSupabaseServerClient());
 
-  const { data, error } = await supabase.from("website_visits").select("*").order("visited_at", { ascending: false }).limit(100);
+  const { data, error } = await supabase.from("website_visits").select("*").order("visited_at", { ascending: false }).limit(500);
 
   if (error) {
     console.error("[visits] failed to load visits", error.message);
@@ -158,9 +184,10 @@ export async function getWebsiteVisits(): Promise<WebsiteVisitsResult> {
     };
   }
 
-  const visits = (data ?? []) as WebsiteVisit[];
+  const loadedVisits = (data ?? []) as WebsiteVisit[];
+  const visits = loadedVisits.filter((visit) => !isLocalWebsiteVisit(visit)).slice(0, 100);
   const warning =
-    !adminClient && !visits.length
+    !adminClient && !loadedVisits.length
       ? "Supabase returned no visit rows through the authenticated session. Configure SUPABASE_SERVICE_ROLE_KEY in Vercel or apply the website_visits admin SELECT policy from supabase/schema.sql."
       : null;
 

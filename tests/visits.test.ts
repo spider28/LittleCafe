@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldTrackPath } from "@/lib/visits";
+import { isLocalVisitHost, recordWebsiteVisitFromRequest, shouldTrackPath } from "@/lib/visits";
 
 describe("visit tracking", () => {
   it("tracks public pages", () => {
@@ -16,5 +16,28 @@ describe("visit tracking", () => {
     expect(shouldTrackPath("/api/visits")).toBe(false);
     expect(shouldTrackPath("/_next/static/app.js")).toBe(false);
     expect(shouldTrackPath("/logo.png")).toBe(false);
+  });
+
+  it("recognizes local development hosts", () => {
+    expect(isLocalVisitHost("localhost")).toBe(true);
+    expect(isLocalVisitHost("localhost:3000")).toBe(true);
+    expect(isLocalVisitHost("app.localhost:3000")).toBe(true);
+    expect(isLocalVisitHost("127.0.0.1:3000")).toBe(true);
+    expect(isLocalVisitHost("[::1]:3000")).toBe(true);
+    expect(isLocalVisitHost("little-cafe.vercel.app")).toBe(false);
+  });
+
+  it("does not record local development visits", async () => {
+    await expect(recordWebsiteVisitFromRequest(new Headers({ host: "localhost:3000" }), { path: "/" })).resolves.toEqual({
+      recorded: false,
+      reason: "ignored-local-visit"
+    });
+
+    await expect(
+      recordWebsiteVisitFromRequest(new Headers({ host: "little-cafe.vercel.app", "x-forwarded-for": "127.0.0.1" }), { path: "/" })
+    ).resolves.toEqual({
+      recorded: false,
+      reason: "ignored-local-visit"
+    });
   });
 });

@@ -77,6 +77,27 @@ describe("website visit data", () => {
     expect(result.warning).toContain("SUPABASE_SERVICE_ROLE_KEY");
   });
 
+  it("filters local development visits out of analytics", async () => {
+    const publicVisit = visit();
+    const rows = [
+      publicVisit,
+      visit({ id: "localhost-host", host: "localhost:3000" }),
+      visit({ id: "loopback-host", host: "127.0.0.1:3000" }),
+      visit({ id: "ipv6-host", host: "[::1]:3000" }),
+      visit({ id: "loopback-ip", ip_address: "127.0.0.1" })
+    ];
+    const limit = vi.fn().mockResolvedValue({ data: rows, error: null });
+    const order = vi.fn(() => ({ limit }));
+    const select = vi.fn(() => ({ order }));
+    supabaseMocks.createSupabaseAdminClient.mockReturnValue({ from: vi.fn(() => ({ select })) });
+
+    const result = await getWebsiteVisits();
+
+    expect(limit).toHaveBeenCalledWith(500);
+    expect(result.visits).toEqual([publicVisit]);
+    expect(result.summary.total).toBe(1);
+  });
+
   it("does not turn database errors into an empty dashboard", async () => {
     const limit = vi.fn().mockResolvedValue({ data: null, error: { message: "database unavailable" } });
     const order = vi.fn(() => ({ limit }));
