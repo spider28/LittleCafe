@@ -3,6 +3,7 @@ import { Chatbot } from "@/components/Chatbot";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { VisitTracker } from "@/components/VisitTracker";
+import { getCurrentUser } from "@/lib/admin";
 import { cafe } from "@/lib/content";
 import { getChatbotSettings } from "@/lib/data";
 import "./globals.css";
@@ -16,13 +17,13 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const chatbotSettings = await getChatbotSettings();
+  const [chatbotSettings, user] = await Promise.all([getChatbotSettings(), getCurrentUser()]);
 
   return (
     <html lang="en">
       <body className="min-h-screen font-sans antialiased">
         <VisitTracker />
-        <Header />
+        <Header initialEmail={user?.email ?? null} />
         <main>{children}</main>
         <Footer />
         {chatbotSettings.enabled ? <Chatbot /> : null}

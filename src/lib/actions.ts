@@ -11,7 +11,12 @@ import { getChatbotSettings } from "./data";
 import { createSupabaseServerClient } from "./supabase";
 import { createEmbedding } from "./rag";
 
-export type ActionState = { ok: boolean; message: string };
+export type ActionState = {
+  ok: boolean;
+  message: string;
+  authChanged?: boolean;
+  redirectTo?: string;
+};
 
 const galleryBucket = "gallery";
 const maxGalleryPhotoSize = 8 * 1024 * 1024;
@@ -32,14 +37,30 @@ export async function signInAction(_state: ActionState, formData: FormData): Pro
     return { ok: false, message: error.message };
   }
 
-  revalidatePath("/admin");
-  redirect("/admin");
+  revalidatePath("/", "layout");
+  return {
+    ok: true,
+    message: "Signed in.",
+    authChanged: true,
+    redirectTo: "/admin"
+  };
 }
 
-export async function signOutAction() {
+export async function signOutAction(_state: ActionState, _formData: FormData): Promise<ActionState> {
   const supabase = await createSupabaseServerClient();
-  await supabase.auth.signOut();
-  redirect("/admin");
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath("/", "layout");
+  return {
+    ok: true,
+    message: "Signed out.",
+    authChanged: true,
+    redirectTo: "/admin"
+  };
 }
 
 export async function submitContactAction(_state: ActionState, formData: FormData): Promise<ActionState> {

@@ -13,17 +13,27 @@ type LoginStatus = {
   email: string | null;
 };
 
-export function Header() {
+export function Header({ initialEmail }: { initialEmail: string | null }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const [loginStatus, setLoginStatus] = useState<LoginStatus>({ loading: true, email: null });
+  const [loginStatus, setLoginStatus] = useState<LoginStatus>({ loading: false, email: initialEmail });
+
+  useEffect(() => {
+    setLoginStatus({ loading: false, email: initialEmail });
+  }, [initialEmail]);
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
+    let active = true;
 
-    supabase.auth.getUser().then(({ data }) => {
-      setLoginStatus({ loading: false, email: data.user?.email ?? null });
-    });
+    const syncLoginStatus = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (active) {
+        setLoginStatus({ loading: false, email: data.user?.email ?? null });
+      }
+    };
+
+    void syncLoginStatus();
 
     const {
       data: { subscription }
@@ -31,8 +41,14 @@ export function Header() {
       setLoginStatus({ loading: false, email: session?.user.email ?? null });
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    window.addEventListener("littlecafe:auth-changed", syncLoginStatus);
+
+    return () => {
+      active = false;
+      window.removeEventListener("littlecafe:auth-changed", syncLoginStatus);
+      subscription.unsubscribe();
+    };
+  }, [pathname]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-black/10 bg-crema/95 backdrop-blur">

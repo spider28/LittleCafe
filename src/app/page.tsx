@@ -6,6 +6,9 @@ export default function HomePage() {
   return (
     <>
       <section className="relative min-h-[70vh] overflow-hidden bg-ink text-white">
+        <div className="absolute right-4 top-3 z-20 max-w-[calc(100%-2rem)] rounded-md bg-black/65 px-3 py-2 text-right text-sm font-semibold text-white shadow-md backdrop-blur-sm sm:right-8">
+          Test Admin credential: admintest@qw.com/01234567
+        </div>
         <img
           src="https://images.unsplash.com/photo-1442512595331-e89e73853f31?auto=format&fit=crop&w=1800&q=80"
           alt="LittleCafe espresso bar"

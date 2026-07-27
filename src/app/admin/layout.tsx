@@ -1,6 +1,5 @@
 import { ActionForm } from "@/components/ActionForm";
 import { Field } from "@/components/Field";
-import { SubmitButton } from "@/components/SubmitButton";
 import { AdminTabs } from "@/components/admin/AdminTabs";
 import { signInAction, signOutAction } from "@/lib/actions";
 import { requireAdmin } from "@/lib/admin";
@@ -17,9 +16,9 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
       <section className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8">
         <h1 className="text-3xl font-bold text-ink">Admin access required</h1>
         <p className="mt-3 text-ink/70">You are signed in, but this account is not in the administrator allowlist.</p>
-        <form action={signOutAction} className="mt-6">
-          <SubmitButton>Sign out</SubmitButton>
-        </form>
+        <div className="mt-6">
+          <ActionForm action={signOutAction} buttonLabel="Sign out" />
+        </div>
       </section>
     );
   }
@@ -32,9 +31,7 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
           <p className="mt-1 text-2xl font-bold text-ink">LittleCafe management</p>
           <p className="mt-1 max-w-72 truncate text-sm text-ink/60">{user.email}</p>
         </div>
-        <form action={signOutAction}>
-          <SubmitButton>Sign out</SubmitButton>
-        </form>
+        <ActionForm action={signOutAction} buttonLabel="Sign out" />
       </div>
 
       <AdminTabs />
