@@ -2,7 +2,10 @@ import { unstable_noStore as noStore } from "next/cache";
 import { fallbackGallery } from "./content";
 import { createSupabaseServerClient } from "./supabase";
 
-export type ChatbotProvider = "openai" | "github";
+import { isChatbotProvider } from "./chat-providers";
+import type { ChatbotProvider } from "./chat-providers";
+
+export type { ChatbotProvider };
 
 export type ChatbotSettings = {
   enabled: boolean;
@@ -11,7 +14,7 @@ export type ChatbotSettings = {
 
 export const defaultChatbotSettings: ChatbotSettings = {
   enabled: true,
-  provider: "openai"
+  provider: "gemini"
 };
 
 export async function getChatbotSettings(): Promise<ChatbotSettings> {
@@ -29,7 +32,7 @@ export async function getChatbotSettings(): Promise<ChatbotSettings> {
 
   return {
     enabled: data.chatbot_enabled,
-    provider: data.chatbot_provider
+    provider: isChatbotProvider(data.chatbot_provider) ? data.chatbot_provider : defaultChatbotSettings.provider
   };
 }
 

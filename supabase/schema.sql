@@ -4,11 +4,19 @@ create extension if not exists vector with schema extensions;
 create table if not exists public.site_settings (
   id text primary key,
   chatbot_enabled boolean not null default true,
-  chatbot_provider text not null default 'openai' check (chatbot_provider in ('openai', 'github')),
+  chatbot_provider text not null default 'gemini' check (chatbot_provider in ('openai', 'github', 'gemini')),
   updated_at timestamptz not null default now(),
   check (id = 'global')
 );
 
+-- Widen the provider list on databases created before Gemini was added.
+alter table public.site_settings drop constraint if exists site_settings_chatbot_provider_check;
+alter table public.site_settings
+  add constraint site_settings_chatbot_provider_check
+  check (chatbot_provider in ('openai', 'github', 'gemini'));
+
+-- Embeddings are stored at 1536 dimensions because pgvector caps HNSW indexes on `vector`
+-- at 2000. Providers that emit wider vectors (Gemini defaults to 3072) are asked for 1536.
 create table if not exists public.chatbot_knowledge_chunks (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -16,9 +24,15 @@ create table if not exists public.chatbot_knowledge_chunks (
   source text not null default 'admin',
   active boolean not null default true,
   embedding extensions.vector(1536) not null,
+  embedding_provider text not null default 'openai',
+  embedding_model text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Vectors from different providers are not comparable, so each chunk records who embedded it.
+alter table public.chatbot_knowledge_chunks add column if not exists embedding_provider text not null default 'openai';
+alter table public.chatbot_knowledge_chunks add column if not exists embedding_model text not null default '';
 
 create table if not exists public.chatbot_threads (
   session_id text primary key,
@@ -44,6 +58,9 @@ create table if not exists public.chatbot_knowledge_gaps (
 create index if not exists chatbot_knowledge_chunks_embedding_idx
 on public.chatbot_knowledge_chunks
 using hnsw (embedding extensions.vector_cosine_ops);
+
+create index if not exists chatbot_knowledge_chunks_provider_idx
+on public.chatbot_knowledge_chunks (embedding_provider);
 
 create index if not exists chatbot_knowledge_gaps_review_idx
 on public.chatbot_knowledge_gaps (status, last_asked_at desc);
@@ -147,7 +164,7 @@ as $$
 $$;
 
 insert into public.site_settings (id, chatbot_enabled, chatbot_provider)
-values ('global', true, 'openai')
+values ('global', true, 'gemini')
 on conflict (id) do nothing;
 
 drop policy if exists "Public can read site settings" on public.site_settings;
@@ -184,10 +201,14 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+-- The signature gained provider_filter, so the older overload is removed first.
+drop function if exists public.match_chatbot_knowledge(extensions.vector, double precision, integer);
+
 create or replace function public.match_chatbot_knowledge(
   query_embedding extensions.vector(1536),
   match_threshold double precision default 0.72,
-  match_count integer default 5
+  match_count integer default 5,
+  provider_filter text default null
 )
 returns table (
   id uuid,
@@ -210,12 +231,15 @@ as $$
   from public.chatbot_knowledge_chunks as chunk
   where
     chunk.active
+    -- Embeddings from different providers occupy different vector spaces, so comparing
+    -- across them produces meaningless similarity scores.
+    and (provider_filter is null or chunk.embedding_provider = provider_filter)
     and 1 - (chunk.embedding <=> query_embedding) >= match_threshold
   order by chunk.embedding <=> query_embedding
   limit least(match_count, 10);
 $$;
 
-grant execute on function public.match_chatbot_knowledge(extensions.vector, double precision, integer) to anon, authenticated;
+grant execute on function public.match_chatbot_knowledge(extensions.vector, double precision, integer, text) to anon, authenticated;
 
 create or replace function public.capture_chatbot_knowledge_gap(
   question_input text,

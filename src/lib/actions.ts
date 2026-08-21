@@ -10,6 +10,8 @@ import { requireAdmin } from "./admin";
 import { getChatbotSettings } from "./data";
 import { createSupabaseServerClient } from "./supabase";
 import { createEmbedding } from "./rag";
+import type { ChatbotEmbedding } from "./rag";
+import { isChatbotProvider } from "./chat-providers";
 
 export type ActionState = {
   ok: boolean;
@@ -269,8 +271,8 @@ export async function updateChatbotSettingsAction(_state: ActionState, formData:
   if (!allowed) redirect("/admin");
 
   const provider = formValue(formData, "provider");
-  if (provider !== "openai" && provider !== "github") {
-    return { ok: false, message: "Choose OpenAI or GitHub as the chatbot provider." };
+  if (!isChatbotProvider(provider)) {
+    return { ok: false, message: "Choose a supported chatbot provider." };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -306,10 +308,10 @@ export async function createChatbotKnowledgeAction(_state: ActionState, formData
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Please check the knowledge details." };
   }
 
-  let embedding: number[];
+  let embedded: ChatbotEmbedding;
   try {
     const settings = await getChatbotSettings();
-    embedding = await createEmbedding(`${parsed.data.title}\n\n${parsed.data.content}`, settings.provider);
+    embedded = await createEmbedding(`${parsed.data.title}\n\n${parsed.data.content}`, settings.provider);
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Embedding generation failed." };
   }
@@ -320,7 +322,9 @@ export async function createChatbotKnowledgeAction(_state: ActionState, formData
     source: parsed.data.source || "admin",
     content: parsed.data.content,
     active: parsed.data.active,
-    embedding
+    embedding: embedded.embedding,
+    embedding_provider: embedded.provider,
+    embedding_model: embedded.model
   });
 
   if (error) {
@@ -364,10 +368,10 @@ export async function approveChatbotKnowledgeGapAction(_state: ActionState, form
     return { ok: false, message: "This question is no longer waiting for review." };
   }
 
-  let embedding: number[];
+  let embedded: ChatbotEmbedding;
   try {
     const settings = await getChatbotSettings();
-    embedding = await createEmbedding(`${parsed.data.title}\n\n${parsed.data.content}`, settings.provider);
+    embedded = await createEmbedding(`${parsed.data.title}\n\n${parsed.data.content}`, settings.provider);
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Embedding generation failed." };
   }
@@ -379,7 +383,9 @@ export async function approveChatbotKnowledgeGapAction(_state: ActionState, form
       source: parsed.data.source || "reviewed question",
       content: parsed.data.content,
       active: true,
-      embedding
+      embedding: embedded.embedding,
+      embedding_provider: embedded.provider,
+      embedding_model: embedded.model
     })
     .select("id")
     .single();

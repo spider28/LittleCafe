@@ -10,7 +10,7 @@ import {
   updateChatbotSettingsAction
 } from "@/lib/actions";
 import { getAdminChatbotData } from "@/lib/data";
-import { env } from "@/lib/env";
+import { chatbotProviders, getChatbotProviderConfig } from "@/lib/chat-providers";
 
 export const metadata = { title: "Chatbot admin" };
 
@@ -39,18 +39,20 @@ export default async function AdminChatbotPage() {
 
             <fieldset className="grid gap-3">
               <legend className="text-sm font-medium text-ink">Provider</legend>
-              <ProviderOption
-                value="openai"
-                label="OpenAI"
-                checked={data.settings.provider === "openai"}
-                detail={`Model: ${env.openaiModel || "not set"} · Endpoint: ${env.openaiEndPoint || "default Responses API"}`}
-              />
-              <ProviderOption
-                value="github"
-                label="GitHub Models"
-                checked={data.settings.provider === "github"}
-                detail={`Model: ${env.githubModel || "not set"} · Endpoint: ${env.githubEndPoint || "not set"}`}
-              />
+              {chatbotProviders.map((provider) => {
+                const config = getChatbotProviderConfig(provider);
+                return (
+                  <ProviderOption
+                    key={provider}
+                    value={provider}
+                    label={config.label}
+                    checked={data.settings.provider === provider}
+                    configured={Boolean(config.apiKey)}
+                    retiredNote={config.retiredNote}
+                    detail={`Model: ${config.chatModel || "not set"} · Embeddings: ${config.embeddingModel || "not set"}`}
+                  />
+                );
+              })}
             </fieldset>
           </ActionForm>
         </AdminPanel>
@@ -154,13 +156,35 @@ export default async function AdminChatbotPage() {
   );
 }
 
-function ProviderOption({ value, label, detail, checked }: { value: string; label: string; detail: string; checked: boolean }) {
+function ProviderOption({
+  value,
+  label,
+  detail,
+  checked,
+  configured,
+  retiredNote
+}: {
+  value: string;
+  label: string;
+  detail: string;
+  checked: boolean;
+  configured: boolean;
+  retiredNote: string | null;
+}) {
   return (
     <label className="flex items-start gap-3 rounded-md border border-black/10 bg-crema p-3 text-sm">
       <input name="provider" type="radio" value={value} defaultChecked={checked} className="mt-1" />
-      <span>
-        <span className="block font-semibold text-ink">{label}</span>
+      <span className="min-w-0">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-ink">{label}</span>
+          {retiredNote ? (
+            <span className="rounded-full bg-berry/10 px-2 py-0.5 text-xs font-semibold text-berry">Retired</span>
+          ) : !configured ? (
+            <span className="rounded-full bg-brass/15 px-2 py-0.5 text-xs font-semibold text-brass">No API key</span>
+          ) : null}
+        </span>
         <span className="block break-words text-ink/65">{detail}</span>
+        {retiredNote ? <span className="mt-1 block break-words text-xs text-berry/80">{retiredNote}</span> : null}
       </span>
     </label>
   );

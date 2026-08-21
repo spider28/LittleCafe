@@ -39,6 +39,12 @@ OPENAI_END_POINT=https://api.openai.com/v1/responses
 OPENAI_MODEL=gpt-5.5
 OPENAI_EMBEDDING_END_POINT=https://api.openai.com/v1/embeddings
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+GEMINI_API_KEY=
+GEMINI_END_POINT=https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+GEMINI_MODEL=gemini-3.7-flash
+GEMINI_EMBEDDING_END_POINT=https://generativelanguage.googleapis.com/v1beta/openai/embeddings
+GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+GEMINI_REASONING_EFFORT=none
 GITHUB_TOKEN=
 GITHUB_END_POINT=https://models.github.ai/inference/chat/completions
 GITHUB_MODEL=openai/gpt-4.1-mini
@@ -73,9 +79,41 @@ values ('AUTH_USER_UUID', 'admin@example.com');
 
 The schema creates the `gallery` storage bucket, public gallery reads, public insert policies for waivers/contact messages, public-read/admin-managed site settings, vector-backed chatbot knowledge, server-side website visit logging, and admin-only management policies for protected records.
 
+## Chatbot Providers
+
+Three providers are selectable in Admin. Keys, endpoints, and model names stay in environment variables.
+
+| Provider | Cost | API shape | Status |
+| --- | --- | --- | --- |
+| **Google Gemini** (default) | Free tier, no card, 1,500 requests/day | OpenAI-compatible chat completions + embeddings | Recommended |
+| OpenAI | Paid | Responses API | Needs `OPENAI_API_KEY` |
+| GitHub Models | — | OpenAI-compatible chat completions | **Retired July 30, 2026** |
+
+Get a free Gemini key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). Gemini's OpenAI-compatible
+endpoint speaks the same wire format as the old GitHub Models provider, so both share one code path.
+
+Model IDs move quickly. `GEMINI_MODEL` defaults to a current Flash model; check the live list and your account's
+rate limits in AI Studio if a request is rejected as an unknown model.
+
+Gemini 3 Flash is a reasoning model and spends internal thinking tokens out of the same budget as `max_tokens`.
+At the 350-token cap it used ~287 on thinking alone, truncating or emptying replies, so the app sends
+`reasoning_effort: "none"`. Raise `GEMINI_REASONING_EFFORT` (`low`/`medium`/`high`) only alongside a larger
+token cap.
+
+The free tier also returns intermittent `503 model overloaded`. There is no retry logic yet, so a visitor sees
+a generic error; retrying the same question works.
+
 ## Chatbot RAG
 
 V2 chatbot RAG uses Supabase Postgres with `pgvector`. Add chatbot knowledge in Admin; each entry is embedded with the embedding model for the selected Admin chatbot provider and stored as `vector(1536)`. On each chat message, `/api/chat` embeds the latest user question, calls the `match_chatbot_knowledge` RPC, and sends the most relevant chunks to the selected chat provider.
+
+Embeddings are stored at 1536 dimensions because pgvector caps HNSW indexes on `vector` at 2000. Gemini embeddings
+default to 3072, so the app requests 1536 explicitly and truncates as a fallback — valid for Matryoshka models,
+which concentrate signal in the leading dimensions.
+
+Every chunk records the `embedding_provider` and `embedding_model` that produced it, and retrieval only searches
+chunks embedded by the active provider. Vectors from different providers are not comparable, so **switching
+providers means the existing knowledge library must be re-added** — otherwise retrieval silently returns nothing.
 
 When retrieval succeeds but finds no relevant approved chunk, question-like visitor input is deduplicated into the Admin **Questions to review** queue. The model reply is shown only as an untrusted draft. An administrator must verify or rewrite it before approval creates an embedding and moves it into the active knowledge library. Visitor messages are never added directly to retrieval.
 

@@ -21,10 +21,19 @@ export default function HomePage() {
             <h1 className="mt-4 text-5xl font-bold leading-tight sm:text-7xl">{cafe.name}</h1>
             <p className="mt-5 text-xl leading-8 text-white/85">{cafe.tagline}</p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/menu" className="rounded-md bg-brass px-5 py-3 text-sm font-semibold text-ink">
+              <Link href="/menu" className="rounded-md bg-brass px-5 py-3 text-sm font-semibold text-ink shadow-sm transition hover:bg-brass/90">
                 View Menu
               </Link>
-              <Link href="/contact" className="rounded-md border border-white/60 px-5 py-3 text-sm font-semibold text-white">
+              <Link
+                href="/calendar"
+                className="rounded-md bg-crema px-5 py-3 text-sm font-semibold text-ink shadow-sm transition hover:bg-white"
+              >
+                View Calendar
+              </Link>
+              <Link
+                href="/contact"
+                className="rounded-md border border-white/60 px-5 py-3 text-sm font-semibold text-white transition hover:border-white hover:bg-white/10"
+              >
                 Contact Us
               </Link>
             </div>

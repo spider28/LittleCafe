@@ -3,7 +3,8 @@ import { cafe, menuSections, pricing } from "@/lib/content";
 import { getChatThreadState, saveChatThreadState } from "@/lib/chat-thread-store";
 import { runChatWorkflow } from "@/lib/chat-workflow";
 import { getChatbotSettings } from "@/lib/data";
-import { env } from "@/lib/env";
+import { getChatbotProviderConfig } from "@/lib/chat-providers";
+import type { ChatbotProvider } from "@/lib/chat-providers";
 import { createTracedModelJsonFetch } from "@/lib/langsmith";
 import { captureChatbotKnowledgeGap } from "@/lib/knowledge-gaps";
 import { formatKnowledgeMatches, retrieveChatbotKnowledge } from "@/lib/rag";
@@ -75,7 +76,7 @@ function cafeContext() {
   ].join("\n");
 }
 
-function logRateLimitHeaders(provider: "openai" | "github", response: Pick<Response, "headers" | "status">) {
+function logRateLimitHeaders(provider: ChatbotProvider, response: Pick<Response, "headers" | "status">) {
   const expectedHeaders = [
     "x-ratelimit-limit",
     "x-ratelimit-remaining",
@@ -149,99 +150,85 @@ export async function POST(request: Request) {
     "Do not invent policies, availability, private events, allergens, or reservations."
   ].join(" ");
 
-  if (settings.provider === "github") {
-    if (!env.githubToken) {
-      return NextResponse.json({ error: "GitHub Models is not configured yet. Add GITHUB_TOKEN to .env.local." }, { status: 503 });
-    }
+  const config = getChatbotProviderConfig(settings.provider);
 
-    const fetchGithubChat = createTracedModelJsonFetch<ChatCompletionResponse>({
-      name: "GitHub Models Chat Completion",
-      provider: "github",
-      model: env.githubModel
+  if (!config.apiKey) {
+    const retired = config.retiredNote ? `${config.retiredNote} ` : "";
+    return NextResponse.json(
+      { error: `${retired}${config.label} is not configured yet. Add ${config.apiKeyEnvName} to .env.local.` },
+      { status: 503 }
+    );
+  }
+
+  const requestHeaders = {
+    Authorization: `Bearer ${config.apiKey}`,
+    ...config.extraHeaders,
+    "Content-Type": "application/json"
+  };
+  const conversation = recentMessages.map((message) => ({
+    role: message.role,
+    content: message.content
+  }));
+
+  let reply = "";
+  let response;
+
+  if (config.api === "chat-completions") {
+    // GitHub Models and the Gemini OpenAI-compatible endpoint share this shape.
+    const fetchChatCompletion = createTracedModelJsonFetch<ChatCompletionResponse>({
+      name: `${config.label} Chat Completion`,
+      provider: config.provider,
+      model: config.chatModel
     });
-    const response = await fetchGithubChat(env.githubEndPoint, {
+    response = await fetchChatCompletion(config.chatEndpoint, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.githubToken}`,
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type": "application/json"
-      },
+      headers: requestHeaders,
       body: JSON.stringify({
-        model: env.githubModel,
+        model: config.chatModel,
         messages: [
           {
             role: "system",
             content: `${instructions}\n\n${context}`
           },
-          ...recentMessages.map((message) => ({
-            role: message.role,
-            content: message.content
-          }))
+          ...conversation
         ],
-        max_tokens: 350
+        max_tokens: 350,
+        ...(config.reasoningEffort ? { reasoning_effort: config.reasoningEffort } : {})
       })
     });
-    logRateLimitHeaders("github", response);
-
-    const data = response.data;
-
-    if (!response.ok) {
-      return NextResponse.json({ error: data.error?.message ?? "The chatbot could not answer right now." }, { status: response.status });
-    }
-
-    const reply = extractChatCompletionText(data);
-    if (!reply) {
-      return NextResponse.json({ error: "The chatbot returned an empty answer." }, { status: 502 });
-    }
-
-    if (retrieval.succeeded && !knowledgeMatches.length) {
-      await captureChatbotKnowledgeGap(latestUserMessage, reply);
-    }
-
-    return NextResponse.json({ reply });
+    logRateLimitHeaders(config.provider, response);
+    reply = response.ok ? extractChatCompletionText(response.data) : "";
+  } else {
+    const fetchOpenAIResponse = createTracedModelJsonFetch<OpenAIResponse>({
+      name: `${config.label} Responses`,
+      provider: config.provider,
+      model: config.chatModel
+    });
+    response = await fetchOpenAIResponse(config.chatEndpoint, {
+      method: "POST",
+      headers: requestHeaders,
+      body: JSON.stringify({
+        model: config.chatModel,
+        instructions,
+        input: [
+          {
+            role: "developer",
+            content: context
+          },
+          ...conversation
+        ],
+        max_output_tokens: 350
+      })
+    });
+    logRateLimitHeaders(config.provider, response);
+    reply = response.ok ? extractText(response.data) : "";
   }
-
-  if (!env.openaiApiKey) {
-    return NextResponse.json({ error: "OpenAI is not configured yet. Add OPENAI_API_KEY to .env.local." }, { status: 503 });
-  }
-
-  const fetchOpenAIResponse = createTracedModelJsonFetch<OpenAIResponse>({
-    name: "OpenAI Responses",
-    provider: "openai",
-    model: env.openaiModel
-  });
-  const response = await fetchOpenAIResponse(env.openaiEndPoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.openaiApiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: env.openaiModel,
-      instructions,
-      input: [
-        {
-          role: "developer",
-          content: context
-        },
-        ...recentMessages.map((message) => ({
-          role: message.role,
-          content: message.content
-        }))
-      ],
-      max_output_tokens: 350
-    })
-  });
-  logRateLimitHeaders("openai", response);
-
-  const data = response.data;
 
   if (!response.ok) {
-    return NextResponse.json({ error: data.error?.message ?? "The chatbot could not answer right now." }, { status: response.status });
+    const message = response.data.error?.message ?? "The chatbot could not answer right now.";
+    return NextResponse.json({ error: config.retiredNote ? `${config.retiredNote} ${message}` : message }, { status: response.status });
   }
 
-  const reply = extractText(data);
   if (!reply) {
     return NextResponse.json({ error: "The chatbot returned an empty answer." }, { status: 502 });
   }

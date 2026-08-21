@@ -1,7 +1,7 @@
 import { createSupabaseServerClient } from "./supabase";
-import { env } from "./env";
+import { getChatbotProviderConfig, knowledgeEmbeddingDimensions } from "./chat-providers";
 import { createTracedModelJsonFetch, createUsageMetadata } from "./langsmith";
-import type { ChatbotProvider } from "./data";
+import type { ChatbotProvider } from "./chat-providers";
 
 export type ChatbotKnowledgeMatch = {
   id: string;
@@ -20,7 +20,12 @@ type EmbeddingResponse = {
   error?: { message?: string };
 };
 
-const matchThreshold = 0.72;
+export type ChatbotEmbedding = {
+  embedding: number[];
+  provider: ChatbotProvider;
+  model: string;
+};
+
 const matchCount = 5;
 
 export type ChatbotKnowledgeRetrieval = {
@@ -28,21 +33,37 @@ export type ChatbotKnowledgeRetrieval = {
   succeeded: boolean;
 };
 
-export async function createEmbedding(input: string, provider: ChatbotProvider) {
-  const isGitHub = provider === "github";
-  const apiKey = isGitHub ? env.githubToken : env.openaiApiKey;
-  const endpoint = isGitHub ? env.githubEmbeddingEndPoint : env.openaiEmbeddingEndPoint;
-  const model = isGitHub ? env.githubEmbeddingModel : env.openaiEmbeddingModel;
-  const providerName = isGitHub ? "GitHub Models" : "OpenAI";
+/**
+ * Matryoshka models (Gemini) put the strongest signal in the leading dimensions, so
+ * truncating a longer vector is the documented way to reach a smaller width. This is a
+ * safety net for providers that ignore the `dimensions` request field; a vector that is
+ * too short cannot be repaired and is a configuration error.
+ */
+export function fitEmbeddingWidth(embedding: number[], label: string) {
+  if (embedding.length === knowledgeEmbeddingDimensions) {
+    return embedding;
+  }
 
-  if (!apiKey) {
-    throw new Error(`${providerName} embeddings are not configured yet. Add ${isGitHub ? "GITHUB_TOKEN" : "OPENAI_API_KEY"} to .env.local.`);
+  if (embedding.length > knowledgeEmbeddingDimensions) {
+    return embedding.slice(0, knowledgeEmbeddingDimensions);
+  }
+
+  throw new Error(
+    `${label} returned ${embedding.length}-dimension embeddings, but chatbot knowledge stores ${knowledgeEmbeddingDimensions}. Pick an embedding model that supports ${knowledgeEmbeddingDimensions} dimensions.`
+  );
+}
+
+export async function createEmbedding(input: string, provider: ChatbotProvider): Promise<ChatbotEmbedding> {
+  const config = getChatbotProviderConfig(provider);
+
+  if (!config.apiKey) {
+    throw new Error(`${config.label} embeddings are not configured yet. Add ${config.apiKeyEnvName} to .env.local.`);
   }
 
   const fetchEmbedding = createTracedModelJsonFetch<EmbeddingResponse>({
-    name: `${providerName} Embeddings`,
-    provider: isGitHub ? "github" : "openai",
-    model,
+    name: `${config.label} Embeddings`,
+    provider: config.provider,
+    model: config.embeddingModel,
     modelType: "llm",
     processOutputs: (outputs) => ({
       status: outputs.status,
@@ -52,21 +73,17 @@ export async function createEmbedding(input: string, provider: ChatbotProvider) 
       usage_metadata: createUsageMetadata(outputs.data.usage)
     })
   });
-  const response = await fetchEmbedding(endpoint, {
+  const response = await fetchEmbedding(config.embeddingEndpoint, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
-      ...(isGitHub
-        ? {
-            Accept: "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28"
-          }
-        : {}),
+      Authorization: `Bearer ${config.apiKey}`,
+      ...config.extraHeaders,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model,
-      input
+      model: config.embeddingModel,
+      input,
+      ...(config.embeddingDimensions ? { dimensions: config.embeddingDimensions } : {})
     })
   });
 
@@ -80,21 +97,29 @@ export async function createEmbedding(input: string, provider: ChatbotProvider) 
     throw new Error("Embedding generation returned an empty vector.");
   }
 
-  return embedding;
+  return {
+    embedding: fitEmbeddingWidth(embedding, config.label),
+    provider: config.provider,
+    model: config.embeddingModel
+  };
 }
 
 export async function retrieveChatbotKnowledge(query: string, provider: ChatbotProvider): Promise<ChatbotKnowledgeRetrieval> {
-  if (provider === "github" ? !env.githubToken : !env.openaiApiKey) {
+  const config = getChatbotProviderConfig(provider);
+  if (!config.apiKey) {
     return { matches: [], succeeded: false };
   }
 
   try {
-    const queryEmbedding = await createEmbedding(query, provider);
+    const { embedding } = await createEmbedding(query, provider);
     const supabase = await createSupabaseServerClient();
+    // Embeddings from different providers are not comparable, so only chunks embedded by
+    // the active provider are searched, at that model's own relevance threshold.
     const { data, error } = await supabase.rpc("match_chatbot_knowledge", {
-      query_embedding: queryEmbedding,
-      match_threshold: matchThreshold,
-      match_count: matchCount
+      query_embedding: embedding,
+      match_threshold: config.matchThreshold,
+      match_count: matchCount,
+      provider_filter: provider
     });
 
     if (error) {

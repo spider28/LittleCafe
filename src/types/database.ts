@@ -7,7 +7,7 @@ export type Database = {
         Row: {
           id: "global";
           chatbot_enabled: boolean;
-          chatbot_provider: "openai" | "github";
+          chatbot_provider: "openai" | "github" | "gemini";
           updated_at: string;
         };
         Insert: {
@@ -27,6 +27,8 @@ export type Database = {
           source: string;
           active: boolean;
           embedding: number[];
+          embedding_provider: string;
+          embedding_model: string;
           created_at: string;
           updated_at: string;
         };
@@ -37,6 +39,8 @@ export type Database = {
           source?: string;
           active?: boolean;
           embedding: number[];
+          embedding_provider?: string;
+          embedding_model?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -233,6 +237,7 @@ export type Database = {
           query_embedding: number[];
           match_threshold?: number;
           match_count?: number;
+          provider_filter?: string | null;
         };
         Returns: Array<{
           id: string;
